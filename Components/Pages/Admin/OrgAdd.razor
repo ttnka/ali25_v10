@@ -1,0 +1,324 @@
+@using System.Text.RegularExpressions;
+@inherits OrgAddBase
+@rendermode InteractiveServer
+
+<RadzenTemplateForm TItem="W100_Org" Data=@newOrg Submit=@SaveOrg>
+    <DataAnnotationsValidator />
+
+    <div class="row">
+        <div class="col-md-4 mb-3">
+            <RadzenFormField Text="RFC" Style="width: 100%;">
+                <RadzenTextBox @bind-Value="@newOrg.Rfc" 
+                              Name="Rfc"
+                              Style="width: 100%"
+                              MaxLength="13"
+                              @oninput="ValidateRfc" />
+                <div class="text-danger">
+                    <ValidationMessage For="@(() => newOrg.Rfc)" />
+                    @if (!string.IsNullOrEmpty(rfcError))
+                    {
+                        <small>@rfcError</small>
+                    }
+                </div>
+            </RadzenFormField>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <RadzenFormField Text="Nombre Comercial" Style="width: 100%;">
+                <RadzenTextBox @bind-Value="@newOrg.Comercial" 
+                              Name="Comercial"
+                              Style="width: 100%"
+                              MaxLength="25" />
+                <div class="text-danger">
+                    <ValidationMessage For="@(() => newOrg.Comercial)" />
+                    @if (newOrg.Comercial?.Length == 25)
+                    {
+                        <small>Has alcanzado el límite máximo de caracteres</small>
+                    }
+                </div>
+            </RadzenFormField>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <RadzenFormField Text="Razón Social" Style="width: 100%;">
+                <RadzenTextBox @bind-Value="@newOrg.RazonSocial" 
+                              Name="RazonSocial"
+                              Style="width: 100%"
+                              MaxLength="75" />
+                <div class="text-danger">
+                    <ValidationMessage For="@(() => newOrg.RazonSocial)" />
+                    @if (newOrg.RazonSocial?.Length == 75)
+                    {
+                        <small>Has alcanzado el límite máximo de caracteres</small>
+                    }
+                </div>
+            </RadzenFormField>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <RadzenFormField Text="Persona Moral" Style="width: 100%;">
+                <RadzenCheckBox @bind-Value="@newOrg.Moral" Disabled="true" />
+                <small class="text-muted d-block">
+                    Se determina automáticamente por la longitud del RFC
+                </small>
+            </RadzenFormField>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4 mb-3">
+            <RadzenFormField Text="Tipo" Style="width: 100%;">
+                <RadzenDropDown TValue="string" 
+                              @bind-Value=@newOrg.Tipo 
+                              Data=@tiposOrg 
+                              Style="width: 100%" />
+            </RadzenFormField>
+        </div>
+        @if (CurrentUser.Nivel > 5)
+        {
+            <div class="col-md-4 mb-3">
+                <RadzenFormField Text="Estado" Style="width: 100%;">
+                    <RadzenNumeric @bind-Value=@newOrg.Estado Style="width: 100%" />
+                </RadzenFormField>
+            </div>
+            <div class="col-md-4 mb-3">
+                <RadzenFormField Text="Activo" Style="width: 100%;">
+                    <RadzenSwitch @bind-Value=@newOrg.Status />
+                </RadzenFormField>
+            </div>
+        }	
+    </div>
+
+    <h4 class="mt-4">Datos del Administrador</h4>
+    <div class="alert alert-info">
+        La contraseña temporal será: Admin{RFC}1.
+        <br/>
+        El administrador deberá cambiarla en su primer inicio de sesión.
+    </div>
+
+    <div class="row">
+        <div class="col-md-4 mb-3">
+            <RadzenFormField Text="Nombre" Style="width: 100%;">
+                <RadzenTextBox @bind-Value="@newAdmin.Nombre" 
+                              Name="Nombre"
+                              Style="width: 100%"
+                              MaxLength="65" />
+                <div class="text-danger">
+                    <ValidationMessage For="@(() => newAdmin.Nombre)" />
+                    @if (newAdmin.Nombre?.Length == 65)
+                    {
+                        <small>Has alcanzado el límite máximo de caracteres</small>
+                    }
+                </div>
+            </RadzenFormField>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <RadzenFormField Text="Apellido Paterno" Style="width: 100%;">
+                <RadzenTextBox @bind-Value="@newAdmin.Paterno" 
+                              Name="Paterno"
+                              Style="width: 100%"
+                              MaxLength="65" />
+                <div class="text-danger">
+                    <ValidationMessage For="@(() => newAdmin.Paterno)" />
+                    @if (newAdmin.Paterno?.Length == 65)
+                    {
+                        <small>Has alcanzado el límite máximo de caracteres</small>
+                    }
+                </div>
+            </RadzenFormField>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <RadzenFormField Text="Apellido Materno" Style="width: 100%;">
+                <RadzenTextBox @bind-Value="@newAdmin.Materno" 
+                              Name="Materno"
+                              Style="width: 100%"
+                              MaxLength="65" />
+                <div class="text-danger">
+                    <ValidationMessage For="@(() => newAdmin.Materno)" />
+                    @if (newAdmin.Materno?.Length == 65)
+                    {
+                        <small>Has alcanzado el límite máximo de caracteres</small>
+                    }
+                </div>
+            </RadzenFormField>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <RadzenFormField Text="Email" Style="width: 100%;">
+                <RadzenTextBox @bind-Value="@adminEmail" 
+                              Name="Email"
+                              Style="width: 100%"
+                              MaxLength="256" />
+                <div class="text-danger">
+                    @if (!string.IsNullOrEmpty(adminEmail) && !adminEmail.Contains('@'))
+                    {
+                        <small>El email debe contener arroba</small>
+                    }
+                    @if (adminEmail?.Length == 256)
+                    {
+                        <small>Has alcanzado el límite máximo de caracteres</small>
+                    }
+                </div>
+            </RadzenFormField>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <RadzenFormField Text="Contraseña" Style="width: 100%;">
+                <div class="input-group">
+                    <RadzenPassword @bind-Value="@adminPassword"
+                                  Style="width: 100%"
+                                  type=@(showPassword ? "text" : "password")
+                                  MaxLength="100" />
+                    <div class="input-group-append">
+                        <RadzenButton Click="@(() => showPassword = !showPassword)"
+                                    Icon="@(showPassword ? "visibility_off" : "visibility")"
+                                    ButtonStyle="ButtonStyle.Light"
+                                    class="h-100" />
+                    </div>
+                </div>
+            </RadzenFormField>
+        </div>
+        
+        <div class="col-md-6 mb-3">
+            <RadzenFormField Text="Confirmar Contraseña" Style="width: 100%;">
+                <div class="input-group">
+                    <RadzenPassword @bind-Value="@adminConfirmPassword"
+                                  Style="width: 100%"
+                                  type=@(showConfirmPassword ? "text" : "password")
+                                  MaxLength="100" />
+                    <div class="input-group-append">
+                        <RadzenButton Click="@(() => showConfirmPassword = !showConfirmPassword)"
+                                    Icon="@(showConfirmPassword ? "visibility_off" : "visibility")"
+                                    ButtonStyle="ButtonStyle.Light"
+                                    class="h-100" />
+                    </div>
+                </div>
+                @if (adminPassword != adminConfirmPassword)
+                {
+                    <div class="text-danger">
+                        <small>Las contraseñas no coinciden</small>
+                    </div>
+                }
+            </RadzenFormField>
+        </div>
+    </div>
+
+    @if (TipoToAdd != "Admin")
+    {
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <RadzenFormField Text="Nivel" Style="width: 100%;">
+                    <RadzenDropDown TValue="int"
+                                    @bind-Value="@nivelSeleccionado"
+                                   Data="@niveles"
+                                   ValueProperty="Key"
+                                   TextProperty="Value"
+                                   Style="width: 100%" />
+                </RadzenFormField>
+            </div>
+            <div class="col-md-6 mb-3">
+                <RadzenFormField Text="Estado" Style="width: 100%;">
+                    <RadzenNumeric @bind-Value=@newAdmin.Estado Style="width: 100%" />
+                </RadzenFormField>
+            </div>
+        </div>
+    }
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                
+                <RadzenDatePicker @bind-Value=@newAdmin.FechaNacimiento 
+                                 Style="width: 100%"
+                                 DateFormat="dd/MM/yyyy"
+                                 InitialViewDate="@DateTime.Now.AddYears(-25)"
+                                 Max="@DateTime.Now.AddYears(-10)"
+                                 Min="@DateTime.Now.AddYears(-80)" />
+                
+            </div>
+            
+        </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <RadzenButton Click="@ResetForm" 
+                         Text="Cancelar" 
+                         ButtonStyle="ButtonStyle.Danger"
+                         class="me-2" />
+                         
+            <RadzenButton Click="@SaveOrg" 
+                         Text="Guardar" 
+                         ButtonStyle="ButtonStyle.Primary"
+                         Disabled="@(!IsFormValid() || isSaving)" />
+        </div>
+    </div>
+</RadzenTemplateForm>
+
+@code {
+    private string? rfcError;
+    bool showPassword;
+    bool showConfirmPassword;
+
+    
+    
+    private void ValidateRfc(ChangeEventArgs e)
+    {
+        var rfc = e.Value?.ToString();
+        rfcError = null;
+
+        if (string.IsNullOrEmpty(rfc))
+        {
+            rfcError = "RFC es obligatorio";
+            return;
+        }
+
+        if (rfc.Length != 12 && rfc.Length != 13)
+        {
+            rfcError = "RFC debe tener 12 o 13 caracteres";
+            return;
+        }
+
+        if (rfc.Length == 12)
+        {
+            if (!Regex.IsMatch(rfc.Substring(0, 3), @"^[A-Za-z]{3}$"))
+            {
+                rfcError = "Los primeros 3 caracteres deben ser letras";
+                return;
+            }
+            if (!Regex.IsMatch(rfc.Substring(3, 6), @"^[0-9]{6}$"))
+            {
+                rfcError = "Los siguientes 6 caracteres deben ser números";
+                return;
+            }
+            if (!Regex.IsMatch(rfc.Substring(9, 3), @"^[A-Za-z0-9]{3}$"))
+            {
+                rfcError = "Los últimos 3 caracteres deben ser alfanuméricos";
+                return;
+            }
+            newOrg.Moral = true;
+        }
+        else if (rfc.Length == 13)
+        {
+            newOrg.Moral = false;
+        }
+    }
+
+    private bool IsFormValid()
+    {
+        return !string.IsNullOrWhiteSpace(newAdmin.Nombre) &&
+               !string.IsNullOrWhiteSpace(newAdmin.Paterno) &&
+               !string.IsNullOrWhiteSpace(adminEmail) &&
+               !string.IsNullOrWhiteSpace(newOrg.Rfc) &&
+               !string.IsNullOrWhiteSpace(newOrg.Comercial) &&
+               !string.IsNullOrWhiteSpace(newOrg.RazonSocial) &&
+               !string.IsNullOrWhiteSpace(adminPassword) &&
+               adminPassword == adminConfirmPassword;
+    }
+} 

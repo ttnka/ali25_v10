@@ -1,0 +1,363 @@
+@inherits UserBase
+
+@rendermode InteractiveServer
+
+<PageTitle>Usuarios</PageTitle>
+
+@if (CurrentUser.Nivel >= 5)
+{
+    <hr style="border: 1px solid black; margin: 20px 0;" />
+    <RadzenAccordion>
+        <Items>
+            <RadzenAccordionItem Text="Agregar Usuario" Icon="person_add"
+                               CollapseTitle="Cerrar formulario" 
+                               ExpandTitle="Agregar nuevo usuario">
+                
+            </RadzenAccordionItem>
+        </Items>
+    </RadzenAccordion>
+    <hr style="border: 1px solid black; margin: 20px 0;" />
+}
+
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h3>Usuarios de la Organización</h3>
+                
+                    <div>
+                        <RadzenButton Click="@RefreshData" 
+                                    Icon="refresh" 
+                                    ButtonStyle="@(isRefreshing ? ButtonStyle.Light : ButtonStyle.Primary)"
+                                    Disabled="@isRefreshing"
+                                    class="me-2">
+                            @(isRefreshing ? "Actualizando..." : "Refrescar")
+                        </RadzenButton>
+                    @if (ListaEdit)
+                    {        
+                        <RadzenButton Click="@(() => showAddDialog = true)" 
+                                    Icon="add_circle_outline" 
+                                    ButtonStyle="ButtonStyle.Success">
+                            Nuevo Usuario
+                        </RadzenButton>
+                    }
+                    </div>
+                
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        </div>
+    }
+    else
+    {
+        <RadzenDataGrid @ref="gridUser" 
+                       TItem="ApplicationUser"
+                       Data="@users" 
+                       Count="@count"
+                       EditMode="@editMode"
+                       ExpandMode="DataGridExpandMode.Single"
+                       RowCreate="@OnCreateRow"
+                       RowUpdate="@OnUpdateRow"
+                       AllowFiltering="true"
+                       AllowColumnResize="true"
+                       AllowAlternatingRows="false"
+                       FilterMode="FilterMode.Advanced"
+                       AllowSorting="true" 
+                       PageSize="10" 
+                       AllowPaging="true"
+                       PagerHorizontalAlign="HorizontalAlign.Left"
+                       ShowPagingSummary="true"
+                       class="rz-shadow-3">
+            <HeaderTemplate>
+                
+            </HeaderTemplate>
+            <Columns>
+                <RadzenDataGridColumn TItem="ApplicationUser" Title="Nombre" Filterable="true" Width="200px">
+                    <Template Context="user">
+                        <div style="white-space:pre-wrap">@($"{user.Nombre} {user.Paterno} {user.Materno}")</div>
+                    </Template>
+                    <EditTemplate Context="user">
+                        <div class="mb-1">
+                            <RadzenFormField Text="Nombre" Style="width: 100%;">
+                                <RadzenTextBox Name="Nombre" @bind-Value="user.Nombre" Style="width: 90%" />
+                                <RadzenRequiredValidator Component="Nombre" Text="El Nombre es Obligatorio." />
+                            </RadzenFormField>
+                        </div>
+
+                        <div class="mb-1">
+                            <RadzenFormField Text="Apellido Paterno" Style="width: 100%;">
+                                <RadzenTextBox Name="Paterno" @bind-Value="user.Paterno" Style="width: 90%" />
+                                <RadzenRequiredValidator Component="Paterno" Text="El Apellido Paterno es Obligatorio." />
+                            </RadzenFormField>
+                        </div>
+
+                        <div>
+                            <RadzenFormField Text="Apellido Materno" Style="width: 100%;">
+                                <RadzenTextBox Name="Materno" @bind-Value="user.Materno" Style="width: 90%" />
+                            </RadzenFormField>
+                        </div>
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="ApplicationUser" Title="Email" Filterable="true" Width="200px">
+                    <Template Context="user">
+                        @user.Email
+                    </Template>
+                    <EditTemplate Context="user">
+                        <RadzenFormField Text="Email" Style="width: 100%;">
+                            <RadzenTextBox Name="Email" @bind-Value="user.Email" Style="width: 90%" />
+                            <RadzenRequiredValidator Component="Email" Text="El Email es Obligatorio." />
+                            <RadzenEmailValidator Component="Email" Text="Formato de Email inválido." />
+                        </RadzenFormField>
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="ApplicationUser" Title="Nivel" Filterable="true" Width="100px">
+                    <Template Context="user">
+                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@niveles[user.Nivel]" />
+                    </Template>
+                    <EditTemplate Context="user">
+                        <RadzenFormField Text="Nivel" Style="width: 100%;">
+                            <RadzenDropDown Name="Nivel" 
+                                           Data="@niveles" 
+                                           @bind-Value="user.Nivel"
+                                           TextProperty="Value" 
+                                           ValueProperty="Key" 
+                                           Style="width: 90%;" />
+                        </RadzenFormField>
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="ApplicationUser" Title="Estado" Filterable="true" Width="100px">
+                    <Template Context="user">
+                        <RadzenBadge BadgeStyle="@(user.EsActivo ? BadgeStyle.Success : BadgeStyle.Danger)"
+                                    Text="@(user.EsActivo ? "Activo" : "Inactivo")" />
+                    </Template>
+                    <EditTemplate Context="user">
+                        <RadzenFormField Text="Estado" Style="width: 100%;">
+                            <RadzenSwitch @bind-Value="user.EsActivo" />
+                        </RadzenFormField>
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="ApplicationUser" Context="user" 
+                                    Filterable="false" 
+                                    Sortable="false" 
+                                    TextAlign="TextAlign.Center" 
+                                    Width="100px">
+                    <Template Context="user">
+                        @if (ListaEdit)
+                        {
+                            <RadzenButton Click="@(() => EditRow(user))" 
+                                        Icon="edit" 
+                                        ButtonStyle="ButtonStyle.Light" 
+                                        Variant="Variant.Flat" 
+                                        Size="ButtonSize.Medium"
+                                        Disabled="@isEditing" />
+                            
+                        }
+                    </Template>
+                    <EditTemplate Context="user">
+                        <RadzenButton Icon="check" 
+                                    ButtonStyle="ButtonStyle.Success" 
+                                    Variant="Variant.Flat" 
+                                    Size="ButtonSize.Medium"
+                                    Click="@(() => SaveRow(user))" />
+                        <RadzenButton Icon="close" 
+                                    ButtonStyle="ButtonStyle.Light" 
+                                    Variant="Variant.Flat" 
+                                    Size="ButtonSize.Medium"
+                                    Click="@(() => CancelEdit(user))" />
+                        <RadzenButton Icon="delete" 
+                                    ButtonStyle="ButtonStyle.Danger" 
+                                    Variant="Variant.Flat" 
+                                    Size="ButtonSize.Medium"
+                                    Click="@(() => DeleteRow(user))" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+        @if (CurrentUser.Nivel >= 5)
+        {
+            <RadzenButton Click="@ToggleBypassCache"
+                        Text="@(bypassCache ? "Lectura" : "Forzar Lectura")"  
+                                ButtonStyle="ButtonStyle.Light"
+                                class="me-2"
+                                disabled="@isRefreshing">
+                    </RadzenButton>
+        }
+    }
+</div>
+
+@code 
+{
+    // <UserAdd OnUserCreated="@HandleUserCreated" TipoOrg="@TipoOrg"  />
+    
+
+    protected void Reset(ApplicationUser user)
+    {
+        usersToInsert.Remove(user);
+        usersToUpdate.Remove(user);
+    }
+    protected void Reset()
+        {
+            usersToInsert.Clear();
+            usersToUpdate.Clear();
+        }
+    protected async Task EditRow(ApplicationUser user)
+    {
+        //if (!gridUser?.IsValid != true) return;
+
+        if (gridUser?.EditMode == DataGridEditMode.Single)
+        {
+            Reset();
+        }
+        if (user.Nivel >= CurrentUser.Nivel) user.Nivel = CurrentUser.Nivel -1;
+        usersToUpdate.Add(user);
+        if (gridUser != null)
+        {
+            await gridUser.EditRow(user);
+        }
+    }
+
+        protected async Task SaveRow(ApplicationUser user)
+        {
+            await gridUser.UpdateRow(user);
+        }
+
+        protected void CancelEdit(ApplicationUser user)
+        {
+            Reset(user);
+            gridUser.CancelEditRow(user);
+        }
+
+        protected async Task DeleteRow(ApplicationUser user)
+        {
+            try 
+            {
+                Reset(user);
+
+                if (users?.Contains(user) == true)
+                {
+                    user.Status = false;
+                    var result = await RepoUser.Update(user, CurrentUser.OrgId, elUser: CurrentUser);
+                    if (!result.Exito)
+                    {
+                        throw new Exception(result.Texto);
+                    }
+
+                    await RepoBitacora.AddBitacora(
+                        userId: CurrentUser.Id,
+                        desc: $"Se eliminó el usuario {user.Nombre} {user.Paterno}",
+                        orgId: CurrentUser.OrgId
+                    );
+
+                    await gridUser.Reload();
+                }
+                else
+                {
+                    gridUser.CancelEditRow(user);
+                    await gridUser.Reload();
+                }
+            }
+            catch (Exception ex)
+            {
+                await RepoBitacora.AddLog(
+                    userId: CurrentUser.Id,
+                    orgId: CurrentUser.OrgId,
+                    desc: $"Error al eliminar usuario: {ex.Message}",
+                    tipoLog: "Error",
+                    origen: "UserBase.DeleteRow"
+                );
+            }
+        }
+
+        protected async Task InsertRow()
+        {
+            //if (!gridUser?.IsValid != true) return;
+
+            if (gridUser?.EditMode == DataGridEditMode.Single)
+            {
+                Reset();
+            }
+
+            var user = new ApplicationUser 
+            { 
+                OrgId = CurrentUser.OrgId,
+                FechaRegistro = DateTime.Now,
+                EsActivo = true,
+                Estado = 5
+            };
+            
+            usersToInsert.Add(user);
+            if (gridUser != null)
+            {
+                await gridUser.InsertRow(user);
+            }
+        }
+
+        protected async Task OnCreateRow(ApplicationUser user)
+        {
+            try
+            {
+                var result = await RepoUser.Insert(user, CurrentUser.OrgId, elUser: CurrentUser);
+                if (!result.Exito)
+                {
+                    throw new Exception(result.Texto);
+                }
+
+                await RepoBitacora.AddBitacora(
+                    userId: CurrentUser.Id,
+                    desc: $"Se creó el usuario {user.Nombre} {user.Paterno}",
+                    orgId: CurrentUser.OrgId
+                );
+
+                usersToInsert.Remove(user);
+            }
+            catch (Exception ex)
+            {
+                await RepoBitacora.AddLog(
+                    userId: CurrentUser.Id,
+                    orgId: CurrentUser.OrgId,
+                    desc: $"Error al crear usuario: {ex.Message}",
+                    tipoLog: "Error",
+                    origen: "UserBase.OnCreateRow"
+                );
+            }
+        }
+        
+        protected async Task OnUpdateRow(ApplicationUser user)
+        {
+            try
+            {
+                Reset(user);
+                
+                var result = await RepoUser.Update(user, CurrentUser.OrgId, elUser: CurrentUser);
+                if (!result.Exito)
+                {
+                    throw new Exception(result.Texto);
+                }
+
+                await RepoBitacora.AddBitacora(
+                    userId: CurrentUser.Id,
+                    desc: $"Se actualizó el usuario {user.Nombre} {user.Paterno}",
+                    orgId: CurrentUser.OrgId
+                );
+            }
+            catch (Exception ex)
+            {
+                await RepoBitacora.AddLog(
+                    userId: CurrentUser.Id,
+                    orgId: CurrentUser.OrgId,
+                    desc: $"Error al actualizar usuario: {ex.Message}",
+                    tipoLog: "Error",
+                    origen: "UserBase.OnUpdateRow"
+                );
+            }
+        }
+}

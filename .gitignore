@@ -1,0 +1,17 @@
+## Ignorar directorios de compilación
+bin/
+obj/
+
+## Ignorar archivos de Visual Studio
+.vs/
+*.user
+*.userosscache
+*.sln.docstates
+
+## Ignorar archivos de configuración local
+appsettings.Development.json
+
+## Ignorar archivos temporales
+[Tt]emp/
+*.tmp
+*.log 

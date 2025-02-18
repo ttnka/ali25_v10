@@ -1,0 +1,47 @@
+@page "/Admin/Config"
+@inherits ConfigBase
+@rendermode InteractiveServer
+
+<PageTitle>Configuración</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        @if (IsLoading || CurrentUser == null)
+        {
+            <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        }
+        else if (!string.IsNullOrEmpty(ErrorMessage))
+        {
+            <div class="alert alert-danger">@ErrorMessage</div>
+        }
+        else
+        {
+            <CascadingValue Value="@CurrentUser">
+            <RadzenTabs>
+                <Tabs>
+                    <RadzenTabsItem Text="General">
+                        <h3>Configuración General</h3>
+                        @* Contenido de la pestaña general *@
+                    </RadzenTabsItem>
+
+                    <RadzenTabsItem Text="Proveedores">
+                        <User TipoOrg="Admin" LaOrgId="@(CurrentUser?.OrgId ?? string.Empty)"/>
+                        
+                    </RadzenTabsItem>
+
+                    <RadzenTabsItem Text="Organizaciones">
+                                <Org TipoOrgParameter="Admin"/>
+                                
+                    </RadzenTabsItem>
+                </Tabs>
+            </RadzenTabs>
+            </CascadingValue>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <div class="alert alert-warning">
+            No tiene autorización para ver esta página.
+            <a href="Account/Login">Iniciar Sesión</a>
+        </div>
+    </NotAuthorized>
+</AuthorizeView> 

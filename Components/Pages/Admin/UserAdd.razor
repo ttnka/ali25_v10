@@ -1,0 +1,205 @@
+@inherits UserAddBase
+@rendermode InteractiveServer
+
+<RadzenTemplateForm TItem="ApplicationUser" Data=@newUser Submit=@SaveUser>
+    <DataAnnotationsValidator />
+
+    <div class="row">
+        <div class="col-md-4 mb-3">
+            <RadzenFormField Text="Nombre" Style="width: 100%;">
+                <RadzenTextBox @bind-Value="@newUser.Nombre" 
+                              Name="Nombre"
+                              Class="w-100"
+                              MaxLength="65" />
+                <div class="text-danger">
+                    <ValidationMessage For="@(() => newUser.Nombre)" />
+                    @if (newUser.Nombre?.Length == 65)
+                    {
+                        <small>Has alcanzado el límite máximo de caracteres</small>
+                    }
+                </div>
+            </RadzenFormField>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <RadzenFormField Text="Apellido Paterno" Style="width: 100%;">
+                <RadzenTextBox @bind-Value="@newUser.Paterno" 
+                              Name="Paterno"
+                              Class="w-100"
+                              MaxLength="65" />
+                <div class="text-danger">
+                    <ValidationMessage For="@(() => newUser.Paterno)" />
+                    @if (newUser.Paterno?.Length == 65)
+                    {
+                        <small>Has alcanzado el límite máximo de caracteres</small>
+                    }
+                </div>
+            </RadzenFormField>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <RadzenFormField Text="Apellido Materno" Style="width: 100%;">
+                <RadzenTextBox @bind-Value="@newUser.Materno" 
+                              Name="Materno"
+                              Class="w-100"
+                              MaxLength="65" />
+                <div class="text-danger">
+                    <ValidationMessage For="@(() => newUser.Materno)" />
+                    @if (newUser.Materno?.Length == 65)
+                    {
+                        <small>Has alcanzado el límite máximo de caracteres</small>
+                    }
+                </div>
+            </RadzenFormField>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <RadzenFormField Text="Email" Style="width: 100%;">
+                <RadzenTextBox @bind-Value="@userEmail" 
+                              Name="Email"
+                              Class="w-100"
+                              MaxLength="256" />
+                <div class="text-danger">
+                    @if (!string.IsNullOrEmpty(userEmail) && !userEmail.Contains('@'))
+                    {
+                        <small>El email debe contener arroba</small>
+                    }
+                    @if (userEmail?.Length == 256)
+                    {
+                        <small>Has alcanzado el límite máximo de caracteres</small>
+                    }
+                </div>
+            </RadzenFormField>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <RadzenFormField Text="Contraseña" Style="width: 100%;">
+                <div class="input-group">
+                    <RadzenPassword @bind-Value="@userPassword"
+                                   class="w-100" type=@(showPassword ? "text" : "password")
+                                   MaxLength="100" />
+                    <div class="input-group-append">
+                        <RadzenButton Click="@(() => showPassword = !showPassword)"
+                                     Icon="@(showPassword ? "visibility_off" : "visibility")"
+                                     ButtonStyle="ButtonStyle.Light"
+                                     class="h-100" />
+                    </div>
+                </div>
+            </RadzenFormField>
+        </div>
+        
+        <div class="col-md-6 mb-3">
+            <RadzenFormField Text="Confirmar Contraseña" Style="width: 100%;">
+                <div class="input-group">
+                    <RadzenPassword @bind-Value="@userConfirmPassword"
+                                   class="w-100" type=@(showConfirmPassword ? "text" : "password")
+                                   MaxLength="100" />
+                    <div class="input-group-append">
+                        <RadzenButton Click="@(() => showConfirmPassword = !showConfirmPassword)"
+                                     Icon="@(showConfirmPassword ? "visibility_off" : "visibility")"
+                                     ButtonStyle="ButtonStyle.Light"
+                                     class="h-100" />
+                    </div>
+                </div>
+                @if (userPassword != userConfirmPassword)
+                {
+                    <div class="text-danger">
+                        <small>Las contraseñas no coinciden</small>
+                    </div>
+                }
+            </RadzenFormField>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4 mb-3">
+            <RadzenFormField Text="Nivel" Style="width: 100%;">
+                <RadzenDropDown TValue="int"
+                              @bind-Value="@newUser.Nivel"
+                              Data="@niveles"
+                              ValueProperty="Key"
+                              TextProperty="Value"
+                              class="w-100" />
+            </RadzenFormField>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <RadzenFormField Text="Estado" Style="width: 100%;">
+                <RadzenNumeric @bind-Value=@newUser.Estado class="w-100" />
+            </RadzenFormField>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <RadzenFormField Text="Activo" Style="width: 100%;">
+                <RadzenSwitch @bind-Value=@newUser.Status />
+            </RadzenFormField>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <RadzenFormField Text="Fecha de Nacimiento" Style="width: 100%;">
+                <RadzenDatePicker @bind-Value=@newUser.FechaNacimiento 
+                                 class="w-100"
+                                 DateFormat="dd/MM/yyyy"
+                                 InitialViewDate="@DateTime.Now.AddYears(-25)"
+                                 Max="@DateTime.Now.AddYears(-10)"
+                                 Min="@DateTime.Now.AddYears(-80)" />
+            </RadzenFormField>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <RadzenButton Click="@ResetForm" 
+                         Text="Cancelar" 
+                         ButtonStyle="ButtonStyle.Danger"
+                         class="me-2" />
+                         
+            <RadzenButton Click="@SaveUser" 
+                         Text="Guardar" 
+                         ButtonStyle="ButtonStyle.Primary"
+                         Disabled="@(!IsFormValid())" />
+        </div>
+    </div>
+</RadzenTemplateForm>
+
+@code {
+    bool showPassword;
+    bool showConfirmPassword;
+    string? userEmail;
+    string? userPassword;
+    string? userConfirmPassword;
+    string? errorMessage;
+
+    private bool IsFormValid()
+    {
+        return !string.IsNullOrWhiteSpace(newUser.Nombre) &&
+               !string.IsNullOrWhiteSpace(newUser.Paterno) &&
+               !string.IsNullOrWhiteSpace(userEmail) &&
+               !string.IsNullOrWhiteSpace(userPassword) &&
+               userPassword == userConfirmPassword;
+    }
+
+    private void ResetForm()
+    {
+        newUser = new()
+        {
+            Estado = 5,
+            Status = true,
+            EsActivo = true,
+            FechaRegistro = DateTime.Now
+        };
+        userEmail = "";
+        userPassword = "";
+        userConfirmPassword = "";
+        errorMessage = null;
+    }
+} 

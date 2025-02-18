@@ -1,0 +1,337 @@
+@inherits OrgBase
+@rendermode InteractiveServer
+
+@* TEMPORAL_TEST_INICIO - Inyección para diagnóstico de bitácora *@
+@inject IRepoBitacora RepoBitacora
+@* TEMPORAL_TEST_FIN *@
+
+<PageTitle>Organizaciones</PageTitle>
+
+@if (CurrentUser.Nivel >= 5)
+{
+    <RadzenAccordion>
+        <Items>
+            <RadzenAccordionItem Text="Agregar Organización" Icon="add_business"
+                               CollapseTitle="Cerrar formulario" 
+                               ExpandTitle="Agregar nueva organización">
+                <OrgAdd OnOrgCreated="HandleOrgCreated" />
+            </RadzenAccordionItem>
+        </Items>
+    </RadzenAccordion>
+    <hr style="border: 1px solid black; margin: 20px 0;" />
+}
+
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h3>Organizaciones - @TipoOrgParameter</h3>
+                <div>
+                    <RadzenButton Click="@RefreshData" 
+                                Icon="refresh" 
+                                ButtonStyle="@(isRefreshing ? ButtonStyle.Light : ButtonStyle.Primary)"
+                                Disabled="@isRefreshing"
+                                class="me-2">
+                        @(isRefreshing ? "Actualizando..." : "Refrescar")
+                    </RadzenButton>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        </div>
+    }
+    else
+    {
+        <RadzenDataGrid @ref="grid" 
+                       TItem="W100_Org"
+                       Data="@orgs" 
+                       Count="@count"
+                       EditMode="@editMode"
+                       ExpandMode="DataGridExpandMode.Single"
+                       RowUpdate="@OnUpdateRow"
+                       AllowFiltering="true"
+                       AllowColumnResize="true"
+                       AllowAlternatingRows="false"
+                       FilterMode="FilterMode.Advanced"
+                       AllowSorting="true" 
+                       PageSize="10" 
+                       AllowPaging="true"
+                       PagerHorizontalAlign="HorizontalAlign.Left"
+                       ShowPagingSummary="true"
+                       class="rz-shadow-3">
+            <Template Context="data1">
+                <User TipoOrg="@data1.Tipo" LaOrgId="@data1.OrgId" ListaEdit="false"  />
+            </Template>
+            <Columns>
+                <RadzenDataGridColumn TItem="W100_Org" Property="Rfc" Title="RFC" Width="120px">
+                    <Template Context="org">
+                        @org.Rfc
+                    </Template>
+                    <EditTemplate Context="org">
+                        @if (CurrentUser.Nivel >= 6)
+                        {
+                            <RadzenFormField Text="RFC" Style="width: 100%;">
+                                <RadzenTextBox @bind-Value="org.Rfc" Style="width: 90%" MaxLength="13" />
+                                <RadzenRequiredValidator Component="Rfc" Text="El RFC es obligatorio" />
+                            </RadzenFormField>
+                        }
+                        else
+                        {
+                            <div>@org.Rfc</div>
+                        }
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="W100_Org" Property="Comercial" Title="Comercial" Width="200px">
+                    <Template Context="org">
+                        @org.Comercial
+                    </Template>
+                    <EditTemplate Context="org">
+                        <RadzenFormField Text="Comercial" Style="width: 100%;">
+                            <RadzenTextBox @bind-Value="org.Comercial" Style="width: 90%" MaxLength="25" />
+                            <RadzenRequiredValidator Component="Comercial" Text="El nombre comercial es obligatorio" />
+                        </RadzenFormField>
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="W100_Org" Property="RazonSocial" Title="Razón Social" Width="200px">
+                    <Template Context="org">
+                        @org.RazonSocial
+                    </Template>
+                    <EditTemplate Context="org">
+                        <RadzenFormField Text="Razón Social" Style="width: 100%;">
+                            <RadzenTextBox @bind-Value="org.RazonSocial" Style="width: 90%" MaxLength="75" />
+                            <RadzenRequiredValidator Component="RazonSocial" Text="La razón social es obligatoria" />
+                        </RadzenFormField>
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="W100_Org" Property="Tipo" Title="Tipo" Width="100px">
+                    <Template Context="org">
+                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@org.Tipo" />
+                    </Template>
+                    <EditTemplate Context="org">
+                        @if (CurrentUser.Nivel >= 5)
+                        {
+                            <RadzenFormField Text="Tipo" Style="width: 100%;">
+                                <RadzenDropDown @bind-Value="org.Tipo" 
+                                              Data="@tiposOrg"
+                                              Style="width: 90%" />
+                            </RadzenFormField>
+                        }
+                        else
+                        {
+                            <div>@org.Tipo</div>
+                        }
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="W100_Org" Property="Status" Title="Estado" Width="100px">
+                    <Template Context="org">
+                        <RadzenBadge BadgeStyle="@(org.Status ? BadgeStyle.Success : BadgeStyle.Danger)"
+                                    Text="@(org.Status ? "Activo" : "Suspendido")" />
+                    </Template>
+                    <EditTemplate Context="org">
+                        <RadzenFormField Text="Estado" Style="width: 100%;">
+                            <RadzenSwitch @bind-Value="org.Status" />
+                        </RadzenFormField>
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="W100_Org" Context="org" 
+                                    Filterable="false" 
+                                    Sortable="false" 
+                                    TextAlign="TextAlign.Center" 
+                                    Width="100px">
+                    <Template Context="org">
+                        <RadzenButton Icon="edit" 
+                                    ButtonStyle="ButtonStyle.Light" 
+                                    Variant="Variant.Flat" 
+                                    Size="ButtonSize.Medium"
+                                    Click="@(() => EditRow(org))" />
+                    </Template>
+                    <EditTemplate Context="org">
+                        <RadzenButton Icon="check" 
+                                    ButtonStyle="ButtonStyle.Success" 
+                                    Variant="Variant.Flat" 
+                                    Size="ButtonSize.Medium"
+                                    Click="@(() => SaveRow(org))" />
+                        <RadzenButton Icon="close" 
+                                    ButtonStyle="ButtonStyle.Light" 
+                                    Variant="Variant.Flat" 
+                                    Size="ButtonSize.Medium"
+                                    Click="@(() => CancelEdit(org))" />
+                        <RadzenButton Icon="delete" 
+                                    ButtonStyle="ButtonStyle.Danger" 
+                                    Variant="Variant.Flat" 
+                                    Size="ButtonSize.Medium"
+                                    Click="@(() => DeleteRow(org))" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+        @if (CurrentUser.Nivel >= 5)
+        {
+            <RadzenButton Click="@ToggleBypassCache"
+                        Text="@(bypassCache ? "Lectura" : "Forzar Lectura")"  
+                                ButtonStyle="ButtonStyle.Light"
+                                class="me-2"
+                                disabled="@isRefreshing">
+                        
+                    </RadzenButton>
+        }
+    }
+
+    
+</div>
+
+
+
+@code 
+{
+    protected void Reset()
+    {
+        orgsToUpdate.Clear();
+    }
+    protected void Reset(W100_Org org)
+    {
+        orgsToUpdate.Remove(org);
+    }
+
+    protected async Task EditRow(W100_Org org)
+    {
+        if (grid?.EditMode == DataGridEditMode.Single)
+        {
+            Reset();
+        }
+
+        orgsToUpdate.Add(org);
+        if (grid != null)
+        {
+            await grid.EditRow(org);
+        }
+    }
+
+    protected async Task SaveRow(W100_Org org)
+    {
+        if (grid != null)
+        {
+            await grid.UpdateRow(org);
+        }
+    }
+
+    protected void CancelEdit(W100_Org org)
+    {
+        Reset(org);
+        if (grid != null)
+        {
+            grid.CancelEditRow(org);
+        }
+    }
+
+    protected async Task DeleteRow(W100_Org org)
+    {
+        try 
+        {
+            Reset(org);
+
+            if (orgs?.Contains(org) == true)
+            {
+                org.Status = false;
+                var result = await RepoOrg.Update(org, CurrentUser.OrgId, elUser: CurrentUser);
+                if (!result.Exito)
+                {
+                    throw new Exception(result.Texto);
+                }
+
+                await RepoBitacora.AddBitacora(
+                    userId: CurrentUser.Id,
+                    desc: $"Se eliminó la organización {org.Comercial}",
+                    orgId: CurrentUser.OrgId
+                );
+
+                if (grid != null)
+                {
+                    await grid.Reload();
+                }
+            }
+            else
+            {
+                if (grid != null)
+                {
+                    grid.CancelEditRow(org);
+                    await grid.Reload();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            await RepoBitacora.AddLog(
+                userId: CurrentUser.Id,
+                orgId: CurrentUser.OrgId,
+                desc: $"Error al eliminar organización: {ex.Message}",
+                tipoLog: "Error",
+                origen: "OrgBase.DeleteRow"
+            );
+        }
+    }
+    protected async Task OnUpdateRow(W100_Org org)
+    {
+        try
+        {
+            Reset(org);
+            
+            // Verificar RFC duplicado (excluyendo el RFC actual)
+            var rfcToCheck = org.Rfc.ToUpper();
+            var originalOrg = orgs?.FirstOrDefault(o => o.OrgId == org.OrgId);
+            if (originalOrg != null && 
+                rfcToCheck != originalOrg.Rfc.ToUpper() && 
+                existingRfcs.Contains(rfcToCheck))
+            {
+                throw new Exception($"El RFC {org.Rfc} ya existe en otra organización");
+            }
+
+            var result = await RepoOrg.Update(org, CurrentUser.OrgId, elUser: CurrentUser);
+            if (!result.Exito)
+            {
+                throw new Exception(result.Texto);
+            }
+
+            // Actualizar el conjunto de RFCs
+            if (originalOrg != null)
+            {
+                existingRfcs.Remove(originalOrg.Rfc.ToUpper());
+            }
+            existingRfcs.Add(rfcToCheck);
+
+            await RepoBitacora.AddBitacora(
+                userId: CurrentUser.Id,
+                desc: $"Se actualizó la organización {org.Comercial}",
+                orgId: CurrentUser.OrgId
+            );
+
+            await LoadDataByTipo(); // Recargar datos
+        }
+        catch (Exception ex)
+        {
+            await RepoBitacora.AddLog(
+                userId: CurrentUser.Id,
+                orgId: CurrentUser.OrgId,
+                desc: $"Error al actualizar organización: {ex.Message}",
+                tipoLog: "Error",
+                origen: "OrgBase.OnUpdateRow"
+            );
+            // Revertir cambios en UI
+            if (grid != null)
+            {
+                await grid.Reload();
+            }
+            throw; // Re-lanzar para mostrar error en UI
+        }
+    }
+} 

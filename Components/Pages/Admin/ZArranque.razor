@@ -1,0 +1,65 @@
+@page "/arranque"
+@rendermode InteractiveServer
+@using Ali25_V10.Components.Pages.Admin
+@using Ali25_V10.Data
+@using Ali25_V10.Data.Sistema
+@inherits ZArranqueBase
+
+<PageTitle>Arranque del Sistema</PageTitle>
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="text-center">Arranque del Sistema</h3>
+                </div>
+                <div class="card-body">
+                    @if (isLoading)
+                    {
+                        <div class="text-center">
+                            <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+                        </div>
+                    }
+                    else if (Error)
+                    {
+                        <div class="alert alert-danger">@ErrorMessage</div>
+                    }
+                    else if (Success)
+                    {
+                        <div class="alert alert-success">Sistema inicializado correctamente</div>
+                    }
+                    else
+                    {
+                        <div class="form-group">
+                            <label for="password">Contraseña de Arranque:</label>
+                            <div class="input-group">
+                                <input type="@(showPassword ? "text" : "password")"
+                                       class="form-control"
+                                       @bind="Clave.Pass"
+                                       @onkeyup="Enter"/>
+                                <span class="input-group-text" @onclick="TogglePasswordVisibility" style="cursor: pointer;">
+                                    <i class="bi @(showPassword ? "bi-eye-slash" : "bi-eye")"></i>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="text-center mt-3">
+                            <button class="btn btn-primary" @onclick="ValidarArranque">
+                                Iniciar Sistema
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool showPassword = false;
+
+    private void TogglePasswordVisibility()
+    {
+        showPassword = !showPassword;
+    }
+}

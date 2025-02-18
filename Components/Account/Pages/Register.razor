@@ -1,0 +1,236 @@
+@page "/Account/Register"
+
+@using System.ComponentModel.DataAnnotations
+@using System.Text
+@using System.Text.Encodings.Web
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.WebUtilities
+@using Ali25_V10.Data
+@using Ali25_V10.Data.Sistema
+@using Ali25_V10.Data.Modelos
+
+@inject UserManager<ApplicationUser> UserManager
+@inject IUserStore<ApplicationUser> UserStore
+@inject SignInManager<ApplicationUser> SignInManager
+@inject IEmailSender<ApplicationUser> EmailSender
+@inject ILogger<Register> Logger
+@inject NavigationManager NavigationManager
+@inject IdentityRedirectManager RedirectManager
+@inject IRepo<W100_Org> OrgsRepo
+@inject IHttpContextAccessor HttpContextAccessor
+
+<PageTitle>Register</PageTitle>
+
+<h1>Register</h1>
+
+<div class="row">
+    <div class="col-md-4">
+        <StatusMessage Message="@Message" />
+        <EditForm Model="Input" asp-route-returnUrl="@ReturnUrl" method="post" OnValidSubmit="RegisterUser" FormName="register">
+            <DataAnnotationsValidator />
+            <h2>Create a new account.</h2>
+            <hr />
+            <ValidationSummary class="text-danger" role="alert" />
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="name@example.com" />
+                <label for="email">Email</label>
+                <ValidationMessage For="() => Input.Email" class="text-danger" />
+            </div>
+            <div class="form-floating mb-3">
+                <InputText type="password" @bind-Value="Input.Password" class="form-control" autocomplete="new-password" aria-required="true" placeholder="password" />
+                <label for="password">Password</label>
+                <ValidationMessage For="() => Input.Password" class="text-danger" />
+            </div>
+            <div class="form-floating mb-3">
+                <InputText type="password" @bind-Value="Input.ConfirmPassword" class="form-control" autocomplete="new-password" aria-required="true" placeholder="password" />
+                <label for="confirm-password">Confirm Password</label>
+                <ValidationMessage For="() => Input.ConfirmPassword" class="text-danger" />
+            </div>
+            <div class="form-group">
+                <label>Organización</label>
+                <InputSelect @bind-Value="Input.OrgId" class="form-control">
+                    <option value="">Seleccione una organización</option>
+                    @if (Organizaciones != null)
+                    {
+                        @foreach (var org in Organizaciones)
+                        {
+                            <option value="@org.OrgId">@org.RazonSocial</option>
+                        }
+                    }
+                </InputSelect>
+                <ValidationMessage For="() => Input.OrgId" class="text-danger" />
+            </div>
+            <button type="submit" class="w-100 btn btn-lg btn-primary">Register</button>
+        </EditForm>
+    </div>
+    <div class="col-md-6 col-md-offset-2">
+        <section>
+            <h3>Use another service to register.</h3>
+            <hr />
+            <ExternalLoginPicker />
+        </section>
+    </div>
+</div>
+
+@code {
+    // Agregar SystemUser para la consulta inicial de organizaciones
+    private ApplicationUser SystemUser => new()
+    { 
+        Id = Constantes.Sistema_Usuario,
+        UserName = Constantes.Sistema_Usuario,
+        OrgId = Constantes.Sistema_Org
+    };
+
+    private IEnumerable<IdentityError>? identityErrors;
+    private List<W100_Org> Organizaciones = new();
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = new();
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    private string? Message => identityErrors is null ? null : $"Error: {string.Join(", ", identityErrors.Select(error => error.Description))}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Logger.LogInformation("Iniciando carga de organizaciones");
+            
+            // Obtener todas las organizaciones usando SystemUser
+            var orgsResult = await OrgsRepo.GetAll(SystemUser, true);
+            if (orgsResult.Exito && orgsResult.DataVarios != null)
+            {
+                Organizaciones = orgsResult.DataVarios;
+                Logger.LogInformation("Organizaciones cargadas exitosamente: {Count}", 
+                    Organizaciones.Count);
+            }
+            else
+            {
+                Logger.LogError("Error al obtener organizaciones: {Error}", 
+                    string.Join(", ", orgsResult.MsnError));
+                identityErrors = new List<IdentityError> 
+                { 
+                    new IdentityError 
+                    { 
+                        Description = "Error al cargar las organizaciones" 
+                    } 
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error inesperado al cargar organizaciones");
+            identityErrors = new List<IdentityError> 
+            { 
+                new IdentityError 
+                { 
+                    Description = $"Error al inicializar: {ex.Message}" 
+                } 
+            };
+        }
+    }
+
+    public async Task RegisterUser(EditContext editContext)
+    {
+        try
+        {
+            // 1. Validar que tengamos una organización seleccionada
+            if (string.IsNullOrEmpty(Input.OrgId))
+            {
+                Logger.LogError("Error en registro: OrgId está vacío");
+                identityErrors = new List<IdentityError> 
+                { 
+                    new IdentityError 
+                    { 
+                        Description = "Debe seleccionar una organización" 
+                    } 
+                };
+                return;
+            }
+
+            // 2. Crear el usuario con datos básicos
+            var user = CreateUser();
+            user.OrgId = Input.OrgId;
+            user.UserName = Input.Email;
+            user.Email = Input.Email;
+            user.EmailConfirmed = true;
+            user.Nombre = "Usuario";
+            user.Paterno = "Nuevo";
+            user.FechaNacimiento = DateTime.Now;
+            user.EsActivo = true;
+            user.Estado = 1;
+
+            // 3. Intentar guardar el usuario
+            var result = await UserManager.CreateAsync(user, Input.Password);
+
+            if (!result.Succeeded)
+            {
+                Logger.LogError("Error al crear usuario: {Errors}", 
+                    string.Join(", ", result.Errors.Select(e => e.Description)));
+                identityErrors = result.Errors;
+                return;
+            }
+
+            // 4. Login inmediato sin confirmación
+            await SignInManager.SignInAsync(user, isPersistent: false);
+            RedirectManager.RedirectTo(ReturnUrl);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error inesperado durante el registro de usuario");
+            identityErrors = new List<IdentityError> 
+            { 
+                new IdentityError 
+                { 
+                    Description = $"Error inesperado: {ex.Message}" 
+                } 
+            };
+        }
+    }
+
+    private ApplicationUser CreateUser()
+    {
+        try
+        {
+            return Activator.CreateInstance<ApplicationUser>();
+        }
+        catch
+        {
+            throw new InvalidOperationException($"Can't create an instance of '{nameof(ApplicationUser)}'. " +
+                $"Ensure that '{nameof(ApplicationUser)}' is not an abstract class and has a parameterless constructor.");
+        }
+    }
+
+    private IUserEmailStore<ApplicationUser> GetEmailStore()
+    {
+        if (!UserManager.SupportsUserEmail)
+        {
+            throw new NotSupportedException("The default UI requires a user store with email support.");
+        }
+        return (IUserEmailStore<ApplicationUser>)UserStore;
+    }
+
+    private sealed class InputModel
+    {
+        [Required]
+        [EmailAddress]
+        [Display(Name = "Email")]
+        public string Email { get; set; } = "";
+
+        [Required]
+        [StringLength(100, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
+        [DataType(DataType.Password)]
+        [Display(Name = "Password")]
+        public string Password { get; set; } = "";
+
+        [DataType(DataType.Password)]
+        [Display(Name = "Confirm password")]
+        [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
+        public string ConfirmPassword { get; set; } = "";
+
+        [Required(ErrorMessage = "La organización es requerida")]
+        public string OrgId { get; set; } = string.Empty;
+    }
+}
