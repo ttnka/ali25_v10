@@ -15,7 +15,7 @@ public class OrgBase : ComponentBase, IDisposable
 {
     [CascadingParameter] protected ApplicationUser CurrentUser { get; set; } = default!;
     [Inject] protected IRepo<W100_Org> RepoOrg { get; set; } = default!;
-    [Inject] private IRepoBitacora? _repoBitacora { get; set; }
+    [Inject] protected IRepoBitacora RepoBitacora { get; set; } = default!;
     [Parameter] public string TipoOrgParameter { get; set; } = "Cliente"; // Valor por defecto
 
     protected RadzenDataGrid<W100_Org>? grid;
@@ -41,13 +41,24 @@ public class OrgBase : ComponentBase, IDisposable
 
     protected override async Task OnInitializedAsync()
     {
-        if (_repoBitacora == null)
+        try
         {
-            throw new InvalidOperationException("RepoBitacora no fue inyectado correctamente");
-        }
+            // TEMPORAL_TEST_INICIO - Diagnóstico de conexión a base de datos
+            // Propósito: Verificar si la escritura funciona con valores fijos como en ConfigBase
+            await RepoBitacora.AddBitacora(
+                userId: "Prueba",
+                desc: "TEST - Acceso a organizaciones con valores fijos",
+                orgId: "Prueba"
+            );
+            // TEMPORAL_TEST_FIN
 
-        try 
-        {
+            await RepoBitacora.AddBitacora(
+                userId: CurrentUser?.Id ?? "Sistema",
+                desc: $"Accediendo a gestión de organizaciones",
+                orgId: CurrentUser?.OrgId ?? "Sistema",
+                cancellationToken: _ctsBitacora.Token
+            );
+
             if (CurrentUser == null) return;
             
             // Configurar tipos disponibles según nivel del usuario
@@ -70,12 +81,12 @@ public class OrgBase : ComponentBase, IDisposable
         }
         catch (Exception ex)
         {
-            await _repoBitacora.AddLog(
+            await RepoBitacora.AddLog(
                 userId: CurrentUser?.Id ?? "Sistema",
                 orgId: CurrentUser?.OrgId ?? "Sistema",
-                desc: $"Error al inicializar: {ex.Message}",
+                desc: $"Error en inicialización: {ex.Message}",
                 tipoLog: "Error",
-                origen: $"OrgBase.OnInitializedAsync",
+                origen: "OrgBase.OnInitializedAsync",
                 cancellationToken: _ctsBitacora.Token
             );
         }
@@ -90,84 +101,59 @@ public class OrgBase : ComponentBase, IDisposable
     protected async Task LoadDataByTipo(LoadDataArgs? args = null)
     {
         if (isLoading) return;
-        // TEMPORAL_TEST_INICIO - Diagnóstico de IRepoBitacora
-        try 
-        {
-            Console.WriteLine($"Estado de _repoBitacora: {(_repoBitacora == null ? "NULL" : "Instanciado")}");
-            if (_repoBitacora == null) 
-            {
-                Console.WriteLine("WARNING: _repoBitacora es null - No se pueden escribir logs");
-                return;
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error al verificar _repoBitacora: {ex.Message}");
-        }
-        // TEMPORAL_TEST_FIN
         
         try
         {
             isLoading = true;
 
+            await RepoBitacora.AddLog(
+                userId: CurrentUser?.Id ?? "Sistema",
+                desc: $"Iniciando carga de organizaciones tipo {TipoOrgParameter}",
+                tipoLog: "Debug",
+                origen: "OrgBase.LoadDataByTipo",
+                orgId: CurrentUser?.OrgId ?? "Sistema",
+                cancellationToken: _ctsBitacora.Token
+            );
+
             if (CurrentUser?.OrgId != null)
             {
-                string bitTxt = "";
+                var result = await RepoOrg.Get(
+                    orgId: CurrentUser.OrgId,
+                    filtro: x => x.Tipo == TipoOrgParameter,
+                    elUser: CurrentUser,
+                    byPassCache: bypassCache,
+                    cancellationToken: _ctsOperations.Token
+                );
 
-                // TEMPORAL_TEST_INICIO - Prueba de comportamiento del caché
-                ApiRespAll<W100_Org>? result = null;  
-                            
-                for(int i = 1; i <= 5; i++)
-                {
-                    await _repoBitacora.AddLog(
-                        userId: CurrentUser?.Id ?? "Sistema",
-                        desc: $"PRUEBA #{i} - Iniciando llamada a Get",
-                        tipoLog: "Debug",
-                        origen: "OrgBase.LoadDataByTipo.Test",
-                        orgId: CurrentUser?.OrgId ?? "Sistema",
-                        cancellationToken: _ctsBitacora.Token
-                    );
-
-                    result = await RepoOrg.Get(
-                        orgId: CurrentUser?.OrgId ?? "Sistema",
-                        filtro: x => x.Tipo == TipoOrgParameter,
-                        elUser: CurrentUser?? new ApplicationUser(),
-                        byPassCache: bypassCache,
-                        cancellationToken: _ctsOperations.Token
-                    );
-
-                    // Esperar 1 segundo entre llamadas
-                    await Task.Delay(1000);
-                }
-                // TEMPORAL_TEST_FIN
+                string resultDesc = result?.DataVarios != null 
+                    ? $"Se encontraron {result.DataVarios.Count()} organizaciones"
+                    : "No se encontraron organizaciones";
+                
+                await RepoBitacora.AddBitacora(
+                    userId: CurrentUser.Id,
+                    desc: $"Carga de {TipoOrgParameter}: {resultDesc}",
+                    orgId: CurrentUser.OrgId,
+                    cancellationToken: _ctsBitacora.Token
+                );
 
                 if (result?.DataVarios != null && result.DataVarios.Any())
                 {
                     orgs = result.DataVarios.ToList();
                     count = result.DataVarios.Count;
-                    bitTxt = $"Se encontraron {count} organizaciones tipo {TipoOrgParameter}";
                 }
                 else
                 {
                     orgs = new List<W100_Org>();
                     count = 0;
-                    bitTxt = $"No se encontraron organizaciones tipo {TipoOrgParameter}";
                 }
-
-                await _repoBitacora.AddBitacora(
-                    userId: CurrentUser?.Id ?? "Sistema",
-                    desc: bitTxt,
-                    orgId: CurrentUser?.OrgId ?? "Sistema",
-                    cancellationToken: _ctsBitacora.Token
-                );
             }
         }
         catch (OperationCanceledException)
         {
-            await _repoBitacora.AddLog(
+            await RepoBitacora.AddLog(
                 userId: CurrentUser?.Id ?? "Sistema",
                 orgId: CurrentUser?.OrgId ?? "Sistema",
-                desc: "Operación de carga de organizaciones cancelada por timeout",
+                desc: "Operación de carga cancelada por timeout",
                 tipoLog: "Warning",
                 origen: "OrgBase.LoadDataByTipo",
                 cancellationToken: _ctsBitacora.Token
@@ -178,15 +164,18 @@ public class OrgBase : ComponentBase, IDisposable
             orgs = new List<W100_Org>();
             count = 0;
             
-            await _repoBitacora.AddLog(
+            await RepoBitacora.AddLog(
                 userId: CurrentUser?.Id ?? "Sistema",
                 orgId: CurrentUser?.OrgId ?? "Sistema",
-                desc: $"Error al cargar organizaciones tipo {TipoOrgParameter}: {ex.Message}\nStackTrace: {ex.StackTrace}",
+                desc: $"Error en carga de {TipoOrgParameter}:\n" +
+                      $"Mensaje: {ex.Message}\n" +
+                      $"Stack: {ex.StackTrace}\n" +
+                      $"Source: {ex.Source}\n" +
+                      $"BypassCache: {bypassCache}",
                 tipoLog: "Error",
                 origen: $"OrgBase.LoadDataByTipo",
                 cancellationToken: _ctsBitacora.Token
             );
-            
         }
         finally
         {
@@ -198,7 +187,6 @@ public class OrgBase : ComponentBase, IDisposable
     protected async Task RefreshData()
     {
         if (isRefreshing) return;
-        if (_repoBitacora == null) return;
         
         try 
         {   
@@ -207,7 +195,7 @@ public class OrgBase : ComponentBase, IDisposable
         }
         catch (Exception ex)
         {
-            await _repoBitacora.AddLog(
+            await RepoBitacora.AddLog(
                 userId: CurrentUser?.Id ?? "Sistema",
                 orgId: CurrentUser?.OrgId ?? "Sistema",
                 desc: $"Error al refrescar organizaciones: {ex.Message}",
@@ -227,12 +215,4 @@ public class OrgBase : ComponentBase, IDisposable
     {
         bypassCache = !bypassCache;
     }
-
-    
-
-    
-
-    
-
-    
 } 

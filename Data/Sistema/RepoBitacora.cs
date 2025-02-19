@@ -3,25 +3,21 @@ using Ali25_V10.Data.Modelos;
 using Ali25_V10.Data.Sistema;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Logging;
 
 namespace Ali25_V10.Data.Sistema
 {
     public class RepoBitacora : IRepoBitacora
     {
         private readonly BitacoraDbContext _context;
-        private readonly ILogger<RepoBitacora> _logger;
         private readonly IMemoryCache _globalCache;
         private readonly SemaphoreSlim semaphore = new(1, 1);
         private const int Min_actualizar = 5;
 
         public RepoBitacora(
             BitacoraDbContext context,
-            ILogger<RepoBitacora> logger,
             IMemoryCache globalCache)
         {
             _context = context;
-            _logger = logger;
             _globalCache = globalCache;
         }
 
@@ -81,7 +77,6 @@ namespace Ali25_V10.Data.Sistema
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al filtrar la bitácora. Usuario: {UserId}", elUser?.Id ?? "No identificado");
                 respuesta.MsnError.Add($"Error al filtrar la bitácora: {ex.Message}");
                 await AddLog(
                     desc: $"Error al filtrar bitácora: {ex.Message}",
@@ -107,13 +102,17 @@ namespace Ali25_V10.Data.Sistema
 
                 await _context.Bitacoras.AddAsync(bit, cancellationToken);
                 await _context.SaveChangesAsync(cancellationToken);
-                
-                _logger.LogInformation("Log agregado: {Description}. Usuario: {UserId}", desc, userId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al agregar log. Usuario: {UserId}, Descripción: {Description}", 
-                    userId, desc);
+                await AddLog(
+                    desc: $"Error al agregar bitácora: {ex.Message}",
+                    tipoLog: "Error",
+                    origen: "RepoBitacora.AddBitacora",
+                    userId: userId,
+                    orgId: orgId,
+                    cancellationToken: cancellationToken
+                );
             }
         }
 
@@ -137,16 +136,25 @@ namespace Ali25_V10.Data.Sistema
 
                 await _context.Log.AddAsync(log, cancellationToken);
                 await _context.SaveChangesAsync(cancellationToken);
-                
-                _logger.LogInformation(
-                    "Log del sistema agregado - Tipo: {TipoLog}, Origen: {Origen}, Usuario: {UserId}, Descripción: {Description}", 
-                    tipoLog, origen, userId, desc);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, 
-                    "Error al agregar log del sistema. Tipo: {TipoLog}, Origen: {Origen}, Usuario: {UserId}, Descripción: {Description}", 
-                    tipoLog, origen, userId, desc);
+                var errorLog = new Z910_Log(
+                    userId: "Sistema",
+                    orgId: "Sistema",
+                    desc: $"Error crítico en AddLog: {ex.Message}",
+                    tipoLog: "Error",
+                    origen: "RepoBitacora.AddLog"
+                );
+                try
+                {
+                    await _context.Log.AddAsync(errorLog, cancellationToken);
+                    await _context.SaveChangesAsync(cancellationToken);
+                }
+                catch
+                {
+                    // Si falla el log de error, no podemos hacer nada más
+                }
             }
         }
 

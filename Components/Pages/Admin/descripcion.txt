@@ -1,0 +1,181 @@
+Ali25_V10/Components/Pages/Admin/descripcion.txt
+
+ARCHIVOS CONOCIDOS:
+- Ali25_V10/Components/Pages/Admin/ConfigBase.cs
+- Ali25_V10/Components/Pages/Admin/OrgBase.cs
+- Ali25_V10/Data/Sistema/Repo.cs
+- Ali25_V10/Data/Sistema/IRepo.cs
+- Ali25_V10/Data/Modelos/Z900_Bitacora.cs
+- Ali25_V10/Data/Sistema/IRepoBitacora.cs
+- Ali25_V10/.gitignore
+- Ali25_V10/Components/Pages/Admin/UserBase.cs
+
+COMPONENTES DEL SISTEMA:
+
+1. MODELOS
+- Z900_Bitacora.cs
+  Ubicación: Ali25_V10/Data/Modelos/
+  Propósito: Modelo de datos para el registro de bitácora
+  Estado: Funcional
+  Propiedades:
+    - BitacoraId: string[65], Key, Formato: MyGuid("Bit")
+    - Fecha: DateTime, Default: Now
+    - UserId: string[65], ForeignKey
+    - Desc: string
+    - OrgId: string[65], ForeignKey
+  Relaciones:
+    - W100_Org (Org)
+    - ApplicationUser (User)
+  Métodos:
+    - Constructor(userId, desc, orgId)
+    - OrgAdd(org): Manejo de relación bidireccional
+
+2. INTERFACES
+- IRepo.cs
+  Ubicación: Ali25_V10/Data/Sistema/
+  Propósito: Interfaz genérica para repositorios
+  Estado: Funcional
+  Métodos principales:
+    - Get(orgId, filtro, orderby, propiedades, byPassCache, cancellationToken, elUser)
+    - GetAll(elUser, byPassCache, cancellationToken)
+    - GetById(id, orgId, byPassCache, cancellationToken, elUser)
+    - Insert/Update/Delete con sus variantes Plus
+    - GetCount para conteo de registros
+  Características:
+    - Manejo de caché integrado
+    - Control de concurrencia con semáforos
+    - Validación de usuario en cada operación
+
+- IRepoBitacora.cs
+  Ubicación: Ali25_V10/Data/Sistema/
+  Propósito: Interfaz específica para operaciones de bitácora
+  Estado: Funcional
+  Métodos principales:
+    - GetBitacoraFiltrada(orgId, filtro, byPassCache, cancellationToken, elUser)
+      Propósito: Obtener bitácoras filtradas
+      Retorno: ApiRespAll<Z900_Bitacora>
+
+    - AddBitacora(userId, desc, orgId, cancellationToken)
+      Propósito: Registrar acciones de usuarios
+      Requerido: userId, orgId siempre necesarios
+
+    - AddLog(userId, orgId, desc, tipoLog, origen, cancellationToken)
+      Propósito: Registrar acciones del sistema
+      Opcional: userId y orgId pueden ser null
+      TipoLog: Info, Warning, Error, Debug, Security, Audit, Performance
+
+3. IMPLEMENTACIONES
+- Repo.cs
+  Ubicación: Ali25_V10/Data/Sistema/
+  Propósito: Implementación genérica de repositorio con caché
+  Estado: Problemas con caché
+  Áreas críticas: 
+    - Sistema de Caché:
+      * _globalCache: Almacena datos y tiempo de expiración
+      * _lastUpdateTime: Rastrea última actualización
+      * GetCacheKey(): Genera claves únicas por entidad/filtro
+      * IsCacheValid(): Verifica validez del caché
+      * UpdateLastUpdateTime(): Actualiza o invalida caché
+    
+    - Control de Concurrencia:
+      * SemaphoreSlim para operaciones thread-safe
+      * Manejo de transacciones con using scope
+    
+    - Diagnóstico:
+      * _cacheKeysHistory: Lista temporal de claves
+      * Logs detallados de operaciones
+      * Registro de errores en bitácora
+
+- RepoBitacora.cs
+  Ubicación: Ali25_V10/Data/Sistema/
+  Propósito: Implementación de IRepoBitacora
+  Estado: Funcional
+  Dependencias:
+    * BitacoraDbContext
+    * ILogger<RepoBitacora>
+    * IMemoryCache
+  Características:
+    - Control de Concurrencia:
+      * SemaphoreSlim para operaciones thread-safe
+      * Tiempo de caché: 5 minutos (Min_actualizar)
+    
+    - Métodos Implementados:
+      * GetBitacoraFiltrada: Con caché y filtros
+      * AddBitacora: Escritura directa a DB
+      * AddLog: Escritura directa a DB
+    
+    - Manejo de Errores:
+      * Try-catch en cada método
+      * Logging de errores y operaciones
+      * No reintenta operaciones fallidas
+
+4. COMPONENTES BASE
+- OrgBase.cs
+  Ubicación: Ali25_V10/Components/Pages/Admin/
+  Propósito: Componente base para manejo de organizaciones
+  Estado: Problemas con bitácora
+  Dependencias:
+    - IRepo<W100_Org>: Inyectado como required
+    - IRepoBitacora: Inyectado como nullable (posible problema)
+  Diagnóstico actual:
+    - Código de prueba que hace 5 llamadas al caché
+    - Verificación explícita de nulidad de _repoBitacora
+    - Manejo de timeouts con CancellationTokens
+  Métodos principales:
+    - LoadDataByTipo(): Carga organizaciones filtradas por tipo
+    - RefreshData(): Actualiza datos con posible bypass de caché
+    - HandleOrgCreated(): Maneja creación de nuevas organizaciones
+
+- UserBase.cs
+  Ubicación: Ali25_V10/Components/Pages/Admin/
+  Propósito: Componente base para manejo de usuarios
+  Estado: Funcional
+  Dependencias:
+    - IRepo<ApplicationUser>: Inyectado como required
+    - IRepoBitacora: Inyectado como required
+  Características:
+    - Manejo de CancellationTokens:
+      * _ctsOperations: 30 segundos
+      * _ctsBitacora: 5 segundos
+    - Implementa IDisposable
+  Métodos principales:
+    - LoadData(): Carga usuarios filtrados por organización
+    - RefreshData(): Actualiza datos con bypass de caché
+    - HandleUserCreated(): Maneja creación de usuarios
+  Diagnóstico actual:
+    - Escribe dos bitácoras en OnInitializedAsync:
+      * Una con datos de CurrentUser y CancellationToken
+      * Otra con valores fijos ("Segunda", "vacio", "segunda")
+    - No verifica nulidad de CurrentUser al inicio
+
+5. ARCHIVOS DE CONFIGURACIÓN
+- .gitignore
+  Ubicación: Ali25_V10/
+  Propósito: Configuración de archivos ignorados por git
+  Estado: Configurado
+  Excluye: bin/, obj/, .vs/, archivos temporales
+
+6. ARCHIVOS DE DOCUMENTACIÓN
+- Instrucciones.txt
+  Ubicación: Ali25_V10/Components/Pages/Admin/
+  Propósito: Reglas y procedimientos para cambios de código
+  Estado: En uso
+  Contenido: Reglas de operación, proceso de diagnóstico
+
+7. ESTADO ACTUAL DEL SISTEMA
+- Problemas identificados:
+  * Caché no mantiene consistencia
+  * Bitácoras no se escriben correctamente
+  * Posibles problemas de inyección de dependencias
+
+- Próximos pasos:
+  * Diagnóstico de caché en Repo.cs
+  * Verificación de bitácoras
+  * Pruebas de componentes base
+
+ÚLTIMA ACTUALIZACIÓN: 29/Feb/2024
+
+CAMBIOS PENDIENTES:
+- Backup creado de Repo.cs
+- Implementación de nuevo sistema de caché
+- Punto de restauración establecido 

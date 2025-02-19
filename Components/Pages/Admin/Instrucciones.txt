@@ -1,17 +1,38 @@
 REGLAS DE OPERACIÓN PARA CAMBIOS DE CÓDIGO:
 
-1. CONTROL DE CAMBIOS
+1. REGLAS DE IMPLEMENTACIÓN
+- NO usar ILogger:
+  * Sistema de logging no está configurado
+  * Usar IRepoBitacora.AddLog para diagnóstico
+  * Remover/ignorar cualquier referencia a ILogger
+
+- Manejo de CancellationTokens:
+  * Operaciones: 30 segundos (_ctsOperations)
+  * Bitácoras: 5 segundos (_ctsBitacora)
+  * Todos los AddBitacora y AddLog deben incluir cancellationToken
+
+- Disposable Pattern obligatorio en componentes:
+  * Implementar IDisposable
+  * Disponer CancellationTokens
+  * Usar estructura base proporcionada
+
+- Inyección de Dependencias:
+  * IRepoBitacora como required (no nullable)
+  * Usar protected en lugar de private
+  * Inicializar con default! cuando sea required
+
+2. CONTROL DE CAMBIOS
 - NO modificar código que funciona
 - Marcar TODOS los cambios temporales con TEMPORAL_TEST_INICIO y TEMPORAL_TEST_FIN
 - Documentar cada cambio realizado
 - Mantener registro de archivos modificados
 
-2. PROCESO DE DIAGNÓSTICO
+3. PROCESO DE DIAGNÓSTICO
 - Trabajar en un solo problema a la vez
 - Verificar funcionamiento antes y después de cada cambio
 - Mantener respaldo de archivos críticos antes de modificarlos
 
-3. ARCHIVOS CRÍTICOS
+4. ARCHIVOS CRÍTICOS
 - Z900_Bitacora.cs
 - IRepoBitacora.cs
 - RepoBitacora.cs
@@ -19,13 +40,13 @@ REGLAS DE OPERACIÓN PARA CAMBIOS DE CÓDIGO:
 - OrgBase.cs
 - UserBase.cs
 
-4. PROCESO DE COMMIT
+5. PROCESO DE COMMIT
 - Repositorio: github.com/ttnka
 - Documentar cambios en commit message
 - Incluir archivos modificados
 - Incluir propósito del cambio
 
-5. ERRORES ACTUALES
+6. ERRORES ACTUALES
 - Problema con caché en Repo.cs
 - Bitácoras no se escriben
 - Necesidad de diagnóstico sistemático

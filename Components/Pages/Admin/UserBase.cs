@@ -54,6 +54,26 @@ namespace Ali25_V10.Components.Pages.Admin
         {
             try 
             {
+                Console.WriteLine($"{CurrentUser.UserId}");
+                // TEMPORAL_TEST_INICIO - Diagnóstico de UserBase
+                await RepoBitacora.AddBitacora(
+                    userId: "Prueba_USer",
+                    desc: "TEST - Iniciando UserBase",
+                    orgId: "Prueba",
+                    cancellationToken: _ctsBitacora.Token
+                );
+
+                if (CurrentUser == null)
+                {
+                    await RepoBitacora.AddBitacora(
+                        userId: "Prueba_USer",
+                        desc: "TEST - CurrentUser es null en UserBase",
+                        orgId: "Prueba",
+                        cancellationToken: _ctsBitacora.Token
+                    );
+                    return;
+                }
+
                 LaOrgId = CurrentUser.OrgId;
                 
                 var nivelesArray = Constantes.Niveles
@@ -76,18 +96,25 @@ namespace Ali25_V10.Components.Pages.Admin
                     orgId: CurrentUser.OrgId,
                     cancellationToken: _ctsBitacora.Token
                 );
-                await RepoBitacora.AddBitacora(userId: "Segunda", "vacio", "segunda");
+                await RepoBitacora.AddBitacora(
+                    userId: "Segunda_User",
+                    desc: "vacio",
+                    orgId: "segunda_USEr",
+                    cancellationToken: _ctsBitacora.Token
+                );
                 
                 await LoadData();
+
+                // TEMPORAL_TEST_FIN
             }
             catch (Exception ex)
             {
                 await RepoBitacora.AddLog(
                     userId: CurrentUser?.Id ?? "Sistema",
                     orgId: CurrentUser?.OrgId ?? "Sistema",
-                    desc: $"Error al inicializar lista de usuarios: {ex.Message}",
+                    desc: $"Error en UserBase: {ex.Message}\nStack: {ex.StackTrace}",
                     tipoLog: "Error",
-                    origen: $"UserBase.OnInitializedAsync",
+                    origen: "UserBase.OnInitializedAsync",
                     cancellationToken: _ctsBitacora.Token
                 );
             }
