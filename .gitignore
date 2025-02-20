@@ -14,4 +14,9 @@ appsettings.Development.json
 ## Ignorar archivos temporales
 [Tt]emp/
 *.tmp
-*.log 
+*.log
+
+## Ignorar archivos temporales de desarrollo
+**/_temp/
+*.bak
+CHANGELOG.md 

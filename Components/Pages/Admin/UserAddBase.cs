@@ -18,8 +18,10 @@ namespace Ali25_V10.Components.Pages.Admin
         [Inject] protected UserManager<ApplicationUser> UserManager { get; set; } = default!;
         [Inject] protected IRepoBitacora RepoBitacora { get; set; } = default!;
         [Parameter] public EventCallback<ApplicationUser> OnUserCreated { get; set; }
+        [Parameter] public List<W100_Org> Orgs { get; set; } = new();
 
         protected ApplicationUser newUser = new();
+        
         protected string password = "";
         protected string confirmPassword = "";
         protected bool showPassword;
@@ -50,8 +52,8 @@ namespace Ali25_V10.Components.Pages.Admin
             }
 
             // Inicializar nuevo usuario
-            newUser.OrgId = CurrentUser.OrgId;
-            newUser.Estado = 5;
+            
+            newUser.Estado = 3;
             newUser.Status = true;
             newUser.EsActivo = true;
             newUser.FechaRegistro = DateTime.Now;
@@ -115,6 +117,7 @@ namespace Ali25_V10.Components.Pages.Admin
                 isSaving = true;
 
                 newUser.UserName = newUser.Email;
+                password = Orgs.FirstOrDefault(x => x.OrgId == newUser.OrgId)!.Rfc.ToUpper() ?? "";
                 var result = await UserManager.CreateAsync(newUser, password);
 
                 if (!result.Succeeded)
@@ -122,6 +125,7 @@ namespace Ali25_V10.Components.Pages.Admin
                     var errorMsg = string.Join(", ", result.Errors.Select(e => e.Description));
                     throw new Exception($"Error al crear usuario: {errorMsg}");
                 }
+                
 
                 await RepoBitacora.AddBitacora(
                     userId: CurrentUser.Id,
@@ -153,7 +157,7 @@ namespace Ali25_V10.Components.Pages.Admin
         {
             newUser = new()
             {
-                OrgId = CurrentUser.OrgId,
+                
                 Estado = 5,
                 Status = true,
                 EsActivo = true,

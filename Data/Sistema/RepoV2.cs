@@ -8,8 +8,9 @@ using Ali25_V10.Data;
 using Ali25_V10.Data.Modelos;
 using Ali25_V10.Data.Sistema;
 
-namespace Ali25_V10.Data.Sistema;
+//namespace Ali25_V10.Data.Sistema;
 
+/*
 public class RepoV2<TEntity, TDataContext> : IRepo<TEntity>
     where TEntity : class 
     where TDataContext : DbContext
@@ -166,7 +167,7 @@ public class RepoV2<TEntity, TDataContext> : IRepo<TEntity>
     }
     private string ElPrefix(string orgId, string tentity) => $"{orgId}:{tentity}";
     
-/*
+
 private int Min_actualizar = 30;        
     private static ConcurrentDictionary<string, (object Data, DateTime CacheTime, TimeSpan ExpirationTime)> _globalCache = 
             new ConcurrentDictionary<string, (object, DateTime, TimeSpan)>();
@@ -246,7 +247,9 @@ private int Min_actualizar = 30;
     }
     private string ElPrefix(string orgId, string tentity) => $"{orgId}:{tentity}";
     
-*/
+
+//
+
 #endregion
 
     //GET
@@ -1148,4 +1151,4 @@ private int Min_actualizar = 30;
     }
 
 }
-
+*/

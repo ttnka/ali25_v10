@@ -21,6 +21,7 @@ namespace Ali25_V10.Components.Pages.Admin
         [Parameter] public bool ListaEdit { get; set; } = false;
         [Inject] protected IRepo<ApplicationUser> RepoUser { get; set; } = default!;
         [Inject] protected IRepoBitacora RepoBitacora { get; set; } = default!;
+        [Inject] protected IRepo<W100_Org> RepoOrg { get; set; } = default!;
 
 
         protected RadzenDataGrid<ApplicationUser> gridUser = default!;
@@ -35,11 +36,23 @@ namespace Ali25_V10.Components.Pages.Admin
         protected List<ApplicationUser> usersToInsert = new();
         protected List<ApplicationUser> usersToUpdate = new();
 
+        protected List<string> tiposOrgs = Constantes.TiposOrgs
+            .Split(',')
+            .Select(x => x.Trim())
+            .Prepend("Todas")
+            .ToList();
+
         protected DataGridEditMode editMode = DataGridEditMode.Single;
         protected bool isLoading = false;
         protected bool isRefreshing = false;
         protected bool isAdding = false;
         protected bool isEditing = false;
+
+        
+        protected List<W100_Org> orgsPrivadas { get; set; } = new();
+        protected List<W100_Org> orgsFiltradas { get; set; } = new();
+        
+        protected string selectedTipo { get; set; } = "Todas";
 
         private readonly CancellationTokenSource _ctsOperations = new(TimeSpan.FromSeconds(30));
         private readonly CancellationTokenSource _ctsBitacora = new(TimeSpan.FromSeconds(5));
@@ -54,58 +67,43 @@ namespace Ali25_V10.Components.Pages.Admin
         {
             try 
             {
-                
-                // TEMPORAL_TEST_INICIO - Diagnóstico de UserBase
-                await RepoBitacora.AddBitacora(
-                    userId: "Prueba_USer",
-                    desc: "",
-                    orgId: "Prueba",
-                    cancellationToken: _ctsBitacora.Token
-                );
-
-                if (CurrentUser == null)
-                {
-                    await RepoBitacora.AddBitacora(
-                        userId: "Prueba_USer",
-                        desc: "TEST - CurrentUser es null en UserBase",
-                        orgId: "Prueba",
-                        cancellationToken: _ctsBitacora.Token
-                    );
-                    return;
-                }
-
                 LaOrgId = CurrentUser.OrgId;
                 
                 var nivelesArray = Constantes.Niveles
                     .Split(',')
                     .Select(n => n.Trim())
-                    .Where(n => !string.IsNullOrWhiteSpace(n)                    )
+                    .Where(n => !string.IsNullOrWhiteSpace(n) )
                     .ToArray();
-
-        // Crear diccionario temporal
-                
+   
                 for (int i = 0; i < nivelesArray.Length; i++)
                 {
                     niveles.Add(i + 1, nivelesArray[i]);
                 }
 
-        
+                // Cargar organizaciones según nivel de usuario
+                var result = await RepoOrg.Get(
+                    orgId: CurrentUser.OrgId,
+                    elUser: CurrentUser
+                );
+                
+                if (result.Exito)
+                {
+                    orgsPrivadas = result.DataVarios?.ToList() ?? new();
+                    orgsFiltradas = orgsPrivadas; // Inicializar con todas las orgs
+                    if (orgsPrivadas.Any())
+                    {
+                        LaOrgId = orgsPrivadas.First().OrgId;
+                        await LoadData(); // Cargará usuarios de la primera org
+                    }
+                }
+
                 await RepoBitacora.AddBitacora(
                     userId: CurrentUser.Id,
                     desc: $"Accediendo a lista de usuarios de la organización",
                     orgId: CurrentUser.OrgId,
                     cancellationToken: _ctsBitacora.Token
                 );
-                await RepoBitacora.AddBitacora(
-                    userId: "Segunda_User",
-                    desc: "vacio",
-                    orgId: "segunda_USEr",
-                    cancellationToken: _ctsBitacora.Token
-                );
                 
-                await LoadData();
-
-                // TEMPORAL_TEST_FIN
             }
             catch (Exception ex)
             {
@@ -138,16 +136,13 @@ namespace Ali25_V10.Components.Pages.Admin
                 {
                     var result = await RepoUser.Get(
                         orgId: LaOrgId,
-                        filtro: x => x.OrgId == LaOrgId && x.Status == true,
-                        elUser: CurrentUser,
-                        byPassCache: bypassCache,
-                        cancellationToken: _ctsOperations.Token
+                        elUser: CurrentUser
                     );
 
-                    if (result.DataVarios != null && result.DataVarios.Any())
+                    if (result.Exito)
                     {
-                        users = result.DataVarios.ToList();
-                        count = result.DataVarios.Count;
+                        users = result.DataVarios;
+                        count = users?.Count() ?? 0;
                     }
                 }
             }
@@ -161,6 +156,36 @@ namespace Ali25_V10.Components.Pages.Admin
                     origen: "UserBase.LoadData",
                     cancellationToken: _ctsBitacora.Token
                 );
+            }
+            catch (Exception ex)
+            {
+                await RepoBitacora.AddLog(
+                    userId: CurrentUser?.Id ?? "Sistema",
+                    orgId: CurrentUser?.OrgId ?? "Sistema",
+                    desc: $"Error al cargar usuarios: {ex.Message}",
+                    tipoLog: "Error",
+                    origen: "UserBase.LoadData",
+                    cancellationToken: _ctsBitacora.Token
+                );
+            }
+            finally
+            {
+                isLoading = false;
+                StateHasChanged();
+            }
+        }
+        protected async Task FiltroOrgByTipo()
+        {
+            try
+            {
+                isLoading = true;
+                
+                
+                orgsFiltradas = selectedTipo == "Todas" 
+                    ? orgsPrivadas 
+                    : orgsPrivadas.Where(x => x.Tipo == selectedTipo).ToList();
+
+                
             }
             catch (Exception ex)
             {
@@ -210,7 +235,19 @@ namespace Ali25_V10.Components.Pages.Admin
         {
             bypassCache = !bypassCache;
         }
-        
-        
+
+        protected async Task OnOrgSelected(object value)
+        {
+            if (value != null)
+            {
+                LaOrgId = value.ToString();
+                await LoadData();
+            }
+        }
+        protected async Task OnFiltroSelected(object? value)
+        {
+            selectedTipo = value?.ToString() ?? "Todas";
+            await FiltroOrgByTipo();
+        }
     }
 } 

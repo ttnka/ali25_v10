@@ -4,7 +4,7 @@
 
 <PageTitle>Usuarios</PageTitle>
 
-@if (CurrentUser.Nivel >= 5)
+@if (CurrentUser.Nivel >= 5) 
 {
     <hr style="border: 1px solid black; margin: 20px 0;" />
     <RadzenAccordion>
@@ -20,35 +20,49 @@
 }
 
 <div class="container-fluid">
-    <div class="row mb-3">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
-                <h3>Usuarios de la Organización</h3>
-                
-                    <div>
-                        <RadzenButton Click="@RefreshData" 
-                                    Icon="refresh" 
-                                    ButtonStyle="@(isRefreshing ? ButtonStyle.Light : ButtonStyle.Primary)"
-                                    Disabled="@isRefreshing"
-                                    class="me-2">
-                            @(isRefreshing ? "Actualizando..." : "Refrescar")
-                        </RadzenButton>
-                    @if (ListaEdit)
-                    {        
-                        <RadzenButton Click="@(() => showAddDialog = true)" 
-                                    Icon="add_circle_outline" 
-                                    ButtonStyle="ButtonStyle.Success">
-                            Nuevo Usuario
-                        </RadzenButton>
-                    }
-                    </div>
-                
-            </div>
+    <div class="row mb-3 bg-light p-3 rounded">
+        <div class="col-md-4">
+            <RadzenFormField Text="Tipo" Style="width: 100%;">
+                <RadzenDropDown @bind-Value="@selectedTipo"
+                               Data="@tiposOrgs"
+                               Style="width: 100%"
+                               Placeholder="Seleccione un tipo..."
+                               Change="@(async(args) => await OnFiltroSelected(args))" />
+            </RadzenFormField>
+        </div>
+        <div class="col-md-6">
+            <RadzenFormField Text="Organización" Style="width: 100%;">
+                <RadzenDropDown @bind-Value="@LaOrgId"
+                               Data="@orgsFiltradas"
+                               TextProperty="Comercial"
+                               ValueProperty="OrgId"
+                               Change="@(async(args) => await OnOrgSelected(args))"
+                               Style="width: 100%"
+                               Placeholder="Seleccione una organización..." />
+            </RadzenFormField>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+            <RadzenButton Click="@RefreshData" 
+                         Icon="refresh" 
+                         ButtonStyle="@(isRefreshing ? ButtonStyle.Light : ButtonStyle.Primary)"
+                         Disabled="@isRefreshing"
+                         Style="width: 100%">
+                @(isRefreshing ? "Actualizando..." : "Refrescar")
+            </RadzenButton>
         </div>
     </div>
-
+    <RadzenAccordion>
+        <Items>
+            <RadzenAccordionItem Text="Agregar Usuario" Icon="add_business"
+                               CollapseTitle="Cerrar formulario" 
+                               ExpandTitle="Agregar nuevo usuario">
+                <UserAdd OnUserCreated="@HandleUserCreated" Orgs="@orgsPrivadas" />
+            </RadzenAccordionItem>
+        </Items>
+    </RadzenAccordion>
     @if (isLoading)
     {
+        //TODO: Barra de carga
         <div class="text-center">
             <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
         </div>

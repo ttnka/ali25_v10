@@ -23,10 +23,10 @@ namespace Ali25_V10.Data.Sistema
 
         public async Task<ApiRespAll<Z900_Bitacora>> GetBitacoraFiltrada(
             string orgId, 
+            ApplicationUser elUser,
             FiltroBitacora filtro, 
             bool byPassCache = false, 
-            CancellationToken cancellationToken = default, 
-            ApplicationUser elUser = null)
+            CancellationToken cancellationToken = default)
         {
             ApiRespAll<Z900_Bitacora> respuesta = new() { Exito = false, Varios = true };
             var cacheKey = $"Bitacora_{orgId}_{filtro.FechaInicio}_{filtro.FechaFin}_{filtro.UsuarioId}_{filtro.OrgId}_{filtro.Desc}";
@@ -158,14 +158,6 @@ namespace Ali25_V10.Data.Sistema
             }
         }
 
-        Task<ApiRespAll<Z900_Bitacora>> IRepoBitacora.GetBitacoraFiltrada(
-            string orgId,
-            FiltroBitacora filtro,
-            bool byPassCache = false,
-            CancellationToken cancellationToken = default,
-            ApplicationUser elUser = null)
-        {
-            return GetBitacoraFiltrada(orgId, filtro, byPassCache, cancellationToken, elUser);
-        }
+        
     }
 } 

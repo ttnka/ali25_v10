@@ -1,0 +1,92 @@
+@page "/Admin/MisDatos"
+@inherits MisDatosBase
+@rendermode InteractiveServer
+
+<PageTitle>Mis Datos</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-3 bg-light p-3 rounded">
+        <div class="col-md-6">
+            <h3>Datos Personales</h3>
+            
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger">@errorMessage</div>
+            }
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <RadzenFormField Text="Organización" Style="width: 100%;">
+                        <RadzenLabel Text="@(miOrg?.Comercial ?? "")" Style="font-weight: bold;" />
+                    </RadzenFormField>
+                </div>
+                <div class="col-md-6">
+                    <RadzenFormField Text="Nivel" Style="width: 100%;">
+                        <RadzenLabel Text="@Constantes.Niveles.Split(',')[CurrentUser.Nivel - 1]" Style="font-weight: bold;" />
+                    </RadzenFormField>
+                </div>
+            </div>
+
+            <RadzenTemplateForm TItem="ApplicationUser" Data="@CurrentUser" Submit=@SaveChanges>
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <RadzenFormField Text="Nombre" Style="width: 100%;">
+                            <RadzenTextBox @bind-Value="@CurrentUser.Nombre" Style="width: 100%" />
+                            <RadzenRequiredValidator Component="Nombre" Text="El nombre es requerido" />
+                        </RadzenFormField>
+                    </div>
+                    <div class="col-md-4">
+                        <RadzenFormField Text="Apellido Paterno" Style="width: 100%;">
+                            <RadzenTextBox @bind-Value="@CurrentUser.Paterno" Style="width: 100%" />
+                            <RadzenRequiredValidator Component="Paterno" Text="El apellido paterno es requerido" />
+                        </RadzenFormField>
+                    </div>
+                    <div class="col-md-4">
+                        <RadzenFormField Text="Apellido Materno" Style="width: 100%;">
+                            <RadzenTextBox @bind-Value="@CurrentUser.Materno" Style="width: 100%" />
+                        </RadzenFormField>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <RadzenFormField Text="Email" Style="width: 100%;">
+                            <RadzenTextBox @bind-Value="@CurrentUser.Email" Style="width: 100%" />
+                            <RadzenRequiredValidator Component="Email" Text="El email es requerido" />
+                            <RadzenEmailValidator Component="Email" Text="Formato de email inválido" />
+                        </RadzenFormField>
+                    </div>
+                </div>
+
+                <h4 class="mt-4">Cambiar Contraseña</h4>
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <RadzenFormField Text="Contraseña Actual" Style="width: 100%;">
+                            <RadzenPassword @bind-Value="@currentPassword" Style="width: 100%" />
+                        </RadzenFormField>
+                    </div>
+                    <div class="col-md-4">
+                        <RadzenFormField Text="Nueva Contraseña" Style="width: 100%;">
+                            <RadzenPassword @bind-Value="@newPassword" Style="width: 100%" />
+                        </RadzenFormField>
+                    </div>
+                    <div class="col-md-4">
+                        <RadzenFormField Text="Confirmar Contraseña" Style="width: 100%;">
+                            <RadzenPassword @bind-Value="@confirmPassword" Style="width: 100%" />
+                        </RadzenFormField>
+                    </div>
+                </div>
+
+                <div class="row mt-4">
+                    <div class="col">
+                        <RadzenButton ButtonType="ButtonType.Submit"
+                                    Icon="save"
+                                    Text="Guardar Cambios"
+                                    ButtonStyle="ButtonStyle.Primary"
+                                    Disabled="@isSaving" />
+                    </div>
+                </div>
+            </RadzenTemplateForm>
+        </div>
+    </div>
+</div> 

@@ -211,7 +211,15 @@ public class ZArranqueBase : ComponentBase
                 status: Constantes.StatusAdmin
             );
 
-            var respZuver = await OrgsRepo.Insert(orgZuver, Organizacion, elUser: SystemUser);
+            var respZuver = await OrgsRepo.Insert(
+                orgZuver, 
+                orgZuver.OrgId,
+                elUser: new ApplicationUser 
+                { 
+                    Id = Constantes.Sistema_Usuario,
+                    OrgId = Constantes.Sistema_Org 
+                }
+            );
 
             if (respZuver.Exito)
             {
@@ -260,11 +268,11 @@ public class ZArranqueBase : ComponentBase
                     status: Constantes.PgStatus
                 );
 
-                var respPublico = await OrgsRepo.Insert(orgPublico, Organizacion);
-                if (!respPublico.Exito)
-                {
-                    throw new Exception("Error al crear organización pública");
-                }
+                //var respPublico = await OrgsRepo.Insert(orgPublico, Organizacion);
+                //if (!respPublico.Exito)
+                //{
+                //    throw new Exception("Error al crear organización pública");
+                //}
 
                 await RepoBitacora.AddBitacora(
                     userId: Usuario,
@@ -388,18 +396,17 @@ public class ZArranqueBase : ComponentBase
             await PoblarElementos(grupos, Constantes.Calendario_Tipos,
                 "Todas,Actividad,Auditoria,Cumpleaños,Festivo,Reporte,Otros");
 
-            var resp = await ConfigRepo.InsertPlus(grupos, Usuario);
-            if (resp.Exito)
-            {
-                respuesta.Exito = true;
-                respuesta.DataVarios = resp.DataVarios;
-                await RepoBitacora.AddBitacora(
-                    userId: Usuario,
-                    orgId: Organizacion,
-                    desc: $"{TBita}, Se crearon las configuraciones del sistema"
-                    
-                );
-            }
+            //var resp = await ConfigRepo.InsertPlus(grupos, Usuario);
+            //if (resp.Exito)
+            //{
+            //    respuesta.Exito = true;
+            //    respuesta.DataVarios = resp.DataVarios;
+            //    await RepoBitacora.AddBitacora(
+            //        userId: Usuario,
+            //        orgId: Organizacion,
+            //        desc: $"{TBita}, Se crearon las configuraciones del sistema"
+            //    );
+            //}
         }
         catch (Exception ex)
         {

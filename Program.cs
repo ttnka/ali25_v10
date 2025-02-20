@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Radzen;
+using Microsoft.Extensions.Caching.Memory;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -49,6 +50,10 @@ builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSe
 
 // Agregar servicio de memoria caché
 builder.Services.AddMemoryCache();
+builder.Services.Configure<MemoryCacheOptions>(options =>
+{
+    options.SizeLimit = 1024; // 1MB
+});
 
 // Registrar servicios de repositorio
 builder.Services.AddTransient<IRepo<W100_Org>, Repo<W100_Org, ApplicationDbContext>>();
@@ -56,7 +61,7 @@ builder.Services.AddTransient<IRepo<W180_Files>, Repo<W180_Files, ApplicationDbC
 
 builder.Services.AddTransient<IRepo<ApplicationUser>, Repo<ApplicationUser, ApplicationDbContext>>();
 builder.Services.AddTransient<IRepo<ZConfig>, Repo<ZConfig, BitacoraDbContext>>();
-
+builder.Services.AddTransient<IRepo<W210_Clientes>, Repo<W210_Clientes, ApplicationDbContext>>();
 // TEMPORAL_TEST_INICIO - Cambio de Transient a Scoped para diagnóstico
 builder.Services.AddScoped<IRepoBitacora, RepoBitacora>();
 // TEMPORAL_TEST_FIN

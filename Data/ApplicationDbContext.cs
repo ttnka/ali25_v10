@@ -9,6 +9,7 @@ namespace Ali25_V10.Data
     {
         public DbSet<W100_Org> Organizaciones { get; set; }
         public DbSet<W180_Files> Archivos { get; set; }
+        public DbSet<W210_Clientes> Clientes { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {

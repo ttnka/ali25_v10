@@ -1,0 +1,125 @@
+@using Radzen.Blazor
+@using Radzen
+@inherits BitacoraListBase
+
+<div class="container-fluid">
+    <div class="row mb-3 bg-light p-3 rounded">
+        <div class="col-md-6">
+            <h3>Bitácora</h3>
+        </div>
+        <div class="col-md-6 text-end">
+            <RadzenButton Click="@(() => gridBitacora.Reload())"
+                         Icon="refresh"
+                         ButtonStyle="ButtonStyle.Light"
+                         class="me-2">
+                Refrescar
+            </RadzenButton>
+        </div>
+    </div>
+
+    <RadzenAccordion>
+        <Items>
+            <RadzenAccordionItem Text="Filtros" Icon="filter_list" @bind-Expanded="@showFilters">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <RadzenFormField Text="Organización" Style="width: 100%;">
+                            <RadzenDropDown TValue="string"
+                                          @bind-Value="@selectedOrgId"
+                                          Data="@orgsDisponibles"
+                                          TextProperty="Comercial"
+                                          ValueProperty="OrgId"
+                                          Change=@(args => OnOrgSelected(args?.ToString()))
+                                          Style="width: 100%"
+                                          Placeholder="Seleccione una organización..." />
+                        </RadzenFormField>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <RadzenFormField Text="Usuario" Style="width: 100%;">
+                            <RadzenDropDown TValue="string"
+                                          @bind-Value="@selectedUserId"
+                                          Data="@usuariosDisponibles"
+                                          TextProperty="Nombre"
+                                          ValueProperty="Id"
+                                          Change=@(args => OnUserSelected(args?.ToString()))
+                                          Style="width: 100%"
+                                          Placeholder="Seleccione un usuario..." />
+                        </RadzenFormField>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <RadzenFormField Text="Descripción" Style="width: 100%;">
+                            <RadzenTextBox @bind-Value="@descripcionFilter"
+                                         Change=@(args => OnDescripcionChanged(args))
+                                         Style="width: 100%"
+                                         Placeholder="Buscar en descripción..." />
+                        </RadzenFormField>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <RadzenFormField Text="Fecha" Style="width: 100%;">
+                            <RadzenDatePicker TValue="DateTime?"
+                                            @bind-Value="@fechaFilter"
+                                            DateFormat="dd/MM/yyyy"
+                                            Change=@(args => OnFechaChanged(args))
+                                            Style="width: 100%"
+                                            ShowTime="false" />
+                        </RadzenFormField>
+                    </div>
+                    <div class="col-md-8 mb-3">
+                        <RadzenFormField Text="Rango de Fechas" Style="width: 100%;">
+                            <RadzenDateRangePicker TValue="DateRange"
+                                                 Value="@(new DateRange { Start = fechaInicio ?? DateTime.Today, End = fechaFin ?? DateTime.Today })"
+                                                 Change="@OnRangoFechasChanged"
+                                                 DateFormat="dd/MM/yyyy"
+                                                 Style="width: 100%" />
+                        </RadzenFormField>
+                    </div>
+                </div>
+            </RadzenAccordionItem>
+        </Items>
+    </RadzenAccordion>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger mt-3">@errorMessage</div>
+    }
+
+    <RadzenDataGrid @ref="gridBitacora"
+                   Data="@bitacoras"
+                   Count="@count"
+                   LoadData="@LoadPage"
+                   AllowPaging="true"
+                   PageSize="@pageSize"
+                   PagerHorizontalAlign="HorizontalAlign.Left"
+                   ShowPagingSummary="true"
+                   class="rz-shadow-3 mt-3">
+        <Columns>
+            <RadzenDataGridColumn TItem="Z900_Bitacora" Property="Fecha" Title="Fecha" Width="150px">
+                <Template Context="data">
+                    <div class="d-flex flex-column">
+                        <span>@data.Fecha.ToString("dd/MMM/yy")</span>
+                        <small class="text-muted">@data.Fecha.ToString("HH:mm:ss")</small>
+                    </div>
+                </Template>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="Z900_Bitacora" Property="UserId" Title="Usuario" Width="150px">
+                <Template Context="data">
+                    @GetUserDisplay(data.UserId)
+                </Template>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="Z900_Bitacora" Property="Desc" Title="Descripción">
+                <Template Context="data">
+                    @data.Desc
+                </Template>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="Z900_Bitacora" Property="OrgId" Title="Organización" Width="150px">
+                <Template Context="data">
+                    @GetOrgDisplay(data.OrgId)
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+</div> 

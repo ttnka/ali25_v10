@@ -21,11 +21,7 @@ public class ConfigBase : ComponentBase
     {
         try
         {
-            await RepoBitacora.AddBitacora(
-                userId: "Prueba",
-                desc: $"Accediendo a configuración INICIAL",
-                orgId: "Prueba"
-            );
+            
             var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
             var user = authState.User;
 

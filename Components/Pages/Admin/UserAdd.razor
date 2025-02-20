@@ -1,11 +1,26 @@
 @inherits UserAddBase
 @rendermode InteractiveServer
 
-<RadzenTemplateForm TItem="ApplicationUser" Data=@newUser Submit=@SaveUser>
-    <DataAnnotationsValidator />
+@if (Orgs.Any())
+{
+    <RadzenTemplateForm TItem="ApplicationUser" Data=@newUser Submit=@SaveUser>
+        <DataAnnotationsValidator />
+    <div class="row">
+        <div class="col-md-4 mb-3">
+            <RadzenFormField Text="Organización" Style="width: 100%;">
+                <RadzenDropDown TValue="string"
+                              @bind-Value="@newUser.OrgId"
+                              Data="@Orgs"
+                              ValueProperty="OrgId"
+                              TextProperty="Comercial"
+                              class="w-100" />
+            </RadzenFormField>
+        </div>
+    </div>
 
     <div class="row">
         <div class="col-md-4 mb-3">
+
             <RadzenFormField Text="Nombre" Style="width: 100%;">
                 <RadzenTextBox @bind-Value="@newUser.Nombre" 
                               Name="Nombre"
@@ -169,15 +184,15 @@
                          Disabled="@(!IsFormValid())" />
         </div>
     </div>
-</RadzenTemplateForm>
+    </RadzenTemplateForm>
+}
 
 @code {
-    bool showPassword;
-    bool showConfirmPassword;
+    
     string? userEmail;
     string? userPassword;
     string? userConfirmPassword;
-    string? errorMessage;
+    
 
     private bool IsFormValid()
     {
@@ -188,18 +203,5 @@
                userPassword == userConfirmPassword;
     }
 
-    private void ResetForm()
-    {
-        newUser = new()
-        {
-            Estado = 5,
-            Status = true,
-            EsActivo = true,
-            FechaRegistro = DateTime.Now
-        };
-        userEmail = "";
-        userPassword = "";
-        userConfirmPassword = "";
-        errorMessage = null;
-    }
+    
 } 

@@ -7,6 +7,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Ali25_V10.Data;
 using Ali25_V10.Data.Modelos;
 using Ali25_V10.Data.Sistema;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
+using System.Reflection;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Threading;
 
 namespace Ali25_V10.Data.Sistema;
 
@@ -16,11 +23,12 @@ public class Repo<TEntity, TDataContext> : IRepo<TEntity>
 { 
 #region  servicios
     private readonly IServiceScopeFactory _serviceScopeFactory;
-    protected readonly TDataContext context;
-    internal DbSet<TEntity> dbset;
-    private readonly ApplicationDbContext _appDbContext;
+    private readonly IMemoryCache _cache;
+    private readonly MemoryCacheEntryOptions _cacheOptions;
+    private readonly SemaphoreSlim _lock = new(1, 1);
+    protected readonly TDataContext _context;
+    internal DbSet<TEntity> _dbset;
     private static SemaphoreSlim semaphore = new SemaphoreSlim(1, 1);
-    private readonly ILogger<Repo<TEntity, TDataContext>> _logger;
     private readonly IRepoBitacora _repoBitacora;
     // private readonly IRepoLog _repoLog;  // Comentado IRepoLog
 #endregion
@@ -29,708 +37,521 @@ public class Repo<TEntity, TDataContext> : IRepo<TEntity>
     private static List<string> _cacheKeysHistory = new();
     private const int MAX_HISTORY = 10;
 
-    public Repo(TDataContext dataContext, IServiceScopeFactory serviceScopeFactory,
-            ApplicationDbContext appDbContext,
-            ILogger<Repo<TEntity, TDataContext>> logger,
-            IRepoBitacora repoBitacora)
+    // Constantes de caché
+    private const int DEFAULT_CACHE_MINUTES = 30;
+    private const int DEFAULT_SLIDING_MINUTES = 10;
+    private string BorrarTEXTO = "";
+    private class FilterValueExtractor : ExpressionVisitor
     {
-        _serviceScopeFactory = serviceScopeFactory;
-        context = dataContext;
-        dbset = context.Set<TEntity>();
-        _appDbContext = appDbContext;
-        _logger = logger;
-        _repoBitacora = repoBitacora;
-        // _repoLog = repoLog;  // Comentado si existe en el constructor
+        public Dictionary<string, object> ExtractedValues { get; } = new();
+
+        protected override Expression VisitBinary(BinaryExpression node)
+        {
+            if (node.Left is MemberExpression memberExpr)
+            {
+                object? value = null;
+                
+                if (node.Right is ConstantExpression constExpr)
+                {
+                    value = constExpr.Value;
+                }
+                else if (node.Right is MemberExpression rightMemberExpr)
+                {
+                    value = Expression.Lambda(rightMemberExpr).Compile().DynamicInvoke();
+                }
+
+                if (value != null)
+                {
+                    ExtractedValues[memberExpr.Member.Name] = value;
+                }
+            }
+            return base.VisitBinary(node);
+        }
     }
-#region Cache
-    private int Min_actualizar = 30;        
-    private static ConcurrentDictionary<string, (object Data, DateTime CacheTime, TimeSpan ExpirationTime)> _globalCache = 
-            new ConcurrentDictionary<string, (object, DateTime, TimeSpan)>();
-    private static ConcurrentDictionary<string, DateTime> _lastUpdateTime = new ConcurrentDictionary<string, DateTime>();
-    private (string prefix, string cacheKey) GetCacheKey(string orgId, string entityName, 
-        Expression<Func<TEntity, bool>> filtro = null, object regId = null)
+
+    public Repo(
+        TDataContext context,
+        IMemoryCache cache,
+        IConfiguration config,
+        IRepoBitacora repoBitacora,
+        IServiceScopeFactory serviceScopeFactory)
+    {
+        _context = context;
+        _dbset = context.Set<TEntity>();
+        _repoBitacora = repoBitacora;
+        _cache = cache;
+        _serviceScopeFactory = serviceScopeFactory;
+        
+        // Configuración del caché
+        var cacheMinutes = config.GetValue("Cache:MinutesToLive", DEFAULT_CACHE_MINUTES);
+        var slidingMinutes = config.GetValue("Cache:SlidingMinutes", DEFAULT_SLIDING_MINUTES);
+        
+        _cacheOptions = new MemoryCacheEntryOptions()
+            .SetAbsoluteExpiration(TimeSpan.FromMinutes(cacheMinutes))
+            .SetSlidingExpiration(TimeSpan.FromMinutes(slidingMinutes))
+            .SetSize(1)
+            .SetPriority(CacheItemPriority.Normal);
+    }
+
+    private (string prefix, string cacheKey) GetCacheKey(
+        string orgId,
+        string entityName,
+        ApplicationUser elUser,
+        Expression<Func<TEntity, bool>> filtro = null,
+        object regId = null)
     {
         try 
         {
-            var prefix = $"{orgId ?? "NoOrg"}:{entityName ?? "NoEntity"}:";
+            // Clave base
+            var prefix = $"{orgId ?? "NoOrg"}:{entityName ?? "NoEntity"}";
             var cacheKey = prefix;
 
+            // Extraer los filtros
             if (filtro != null)
             {
-                var filterString = filtro.ToString().Replace(" ", "").Replace("\r\n", "");
-                cacheKey += $"filtro:{filterString}:";
+                var filterVisitor = new FilterValueExtractor();
+                filterVisitor.Visit(filtro);
+                
+                // Ordenar los filtros por nombre de propiedad
+                var filterParams = filterVisitor.ExtractedValues
+                    .OrderBy(x => x.Key)
+                    .Select(x => $"{x.Key}={x.Value}")
+                    .ToList();
+
+                if (filterParams.Any())
+                {
+                    cacheKey += $":filtros:{string.Join(",", filterParams)}";
+                }
+            }
+            else
+            {
+                // Si no hay filtros, marcarlo explícitamente
+                cacheKey += ":sin_filtros";
             }
 
             if (regId != null)
             {
-                cacheKey += $"id:{regId}";
+                cacheKey += $":id:{regId}";
             }
+
+            
 
             return (prefix, cacheKey);
         }
         catch (Exception ex)
         {
             _repoBitacora.AddLog(
-                userId: "Sistema",
-                orgId: orgId,
-                desc: $"Error en GetCacheKey: {ex.Message}\nStackTrace: {ex.StackTrace}",
+                userId: elUser.UserId,
+                orgId: elUser.OrgId,
+                desc: $"Error en GetCacheKey: {ex.Message}",
                 tipoLog: "Error",
-                origen: $"Repo.GetCacheKey<{typeof(TEntity).Name}>"
+                origen: "Repo.GetCacheKey"
             ).Wait();
             throw;
         }
     }
-    private class FilterValueExtractor : ExpressionVisitor
-    {
-        public Dictionary<string, object> ExtractedValues { get; } = new Dictionary<string, object>();
 
-        protected override Expression VisitBinary(BinaryExpression node)
-        {
-            if (node.NodeType == ExpressionType.Equal || 
-                node.NodeType == ExpressionType.NotEqual ||
-                node.NodeType == ExpressionType.GreaterThan ||
-                node.NodeType == ExpressionType.GreaterThanOrEqual ||
-                node.NodeType == ExpressionType.LessThan ||
-                node.NodeType == ExpressionType.LessThanOrEqual)
-            {
-                if (node.Left is MemberExpression memberExpr)
-                {
-                    if (node.Right is ConstantExpression constantExpr)
-                    {
-                        ExtractedValues[memberExpr.Member.Name] = constantExpr.Value;
-                    }
-                    else if (node.Right is MemberExpression rightMemberExpr)
-                    {
-                        var rightMember = Expression.Lambda(rightMemberExpr).Compile().DynamicInvoke();
-                        ExtractedValues[memberExpr.Member.Name] = rightMember;
-                    }
-                }
-            }
-            return base.VisitBinary(node);
-        }
-    }
-    
-    private void UpdateLastUpdateTime(string cacheKey, bool consulta)
+    // Para tipos referencia (clases)
+    private async Task<(bool found, T? value)> TryGetFromCache<T>(string key) where T : class
     {
+        await _lock.WaitAsync();
         try
         {
-            var now = DateTime.UtcNow;
-            if (!consulta)
+            if (_cache.TryGetValue(key, out object? cached) && cached is T value)
             {
-                var prefix = cacheKey.Split(':')[0] + ":" + cacheKey.Split(':')[1] + ":";
-                var keysToRemove = _globalCache.Keys
-                    .Where(k => k.StartsWith(prefix))
-                    .ToList();
-
-                foreach (var key in keysToRemove)
-                {
-                    _globalCache.TryRemove(key, out _);
-                }
+                return (true, value);
             }
-            _lastUpdateTime[cacheKey] = now;
+            return (false, null);
         }
-        catch (Exception ex)
+        finally
         {
-            _repoBitacora.AddLog(
-                userId: "Sistema",
-                orgId: cacheKey.Split(':')[0],
-                desc: $"Error en UpdateLastUpdateTime: {ex.Message}\nStackTrace: {ex.StackTrace}\nCacheKey: {cacheKey}, Consulta: {consulta}",
-                tipoLog: "Error",
-                origen: $"Repo.UpdateLastUpdateTime<{typeof(TEntity).Name}>"
-            ).Wait();
-            throw;
+            _lock.Release();
         }
     }
-    
-    private bool IsCacheValid(string cacheKey, DateTime cacheTime, TimeSpan horaCaduca)
+
+    // Para tipos valor (int, etc)
+    private async Task<(bool found, int value)> TryGetFromCacheInt(string key)
     {
+        await _lock.WaitAsync();
         try
         {
-            if(_lastUpdateTime.TryGetValue(cacheKey, out var lastUpdate) && lastUpdate > cacheTime)
+            if (_cache.TryGetValue(key, out object? cached) && cached is int value)
             {
-                return false;
+                return (true, value);
             }
-            return _globalCache.ContainsKey(cacheKey) && (DateTime.UtcNow - cacheTime) < horaCaduca;
+            return (false, 0);
         }
-        catch (Exception ex)
+        finally
         {
-            _repoBitacora.AddLog(
-                userId: "Sistema",
-                orgId: cacheKey.Split(':')[0],
-                desc: $"Error en IsCacheValid: {ex.Message}\nStackTrace: {ex.StackTrace}\nCacheKey: {cacheKey}, CacheTime: {cacheTime}",
-                tipoLog: "Error",
-                origen: $"Repo.IsCacheValid<{typeof(TEntity).Name}>"
-            ).Wait();
-            throw;
+            _lock.Release();
         }
     }
-    private string ElPrefix(string orgId, string tentity) => $"{orgId}:{tentity}";
-    
-/*
-private int Min_actualizar = 30;        
-    private static ConcurrentDictionary<string, (object Data, DateTime CacheTime, TimeSpan ExpirationTime)> _globalCache = 
-            new ConcurrentDictionary<string, (object, DateTime, TimeSpan)>();
-    private static ConcurrentDictionary<string, DateTime> _lastUpdateTime = new ConcurrentDictionary<string, DateTime>();
-    private (string prefix, string cacheKey) GetCacheKey(string orgId, string entityName, 
-        Expression<Func<TEntity, bool>> filtro = null, object regId = null)
+
+    private async Task SetInCache<T>(string key, T value)
     {
-        var prefix = $"{orgId}:{entityName}:";
-        var cacheKey = prefix;
-
-        if (filtro != null)
+        await _lock.WaitAsync();
+        try
         {
-            // Convertir la expresión del filtro a una representación de string más confiable
-            var filterString = filtro.ToString().Replace(" ", "").Replace("\r\n", "");
-            cacheKey += $"filtro:{filterString}:";
+            _cache.Set(key, value, _cacheOptions);
         }
-
-        if (regId != null)
+        finally
         {
-            cacheKey += $"id:{regId}";
+            _lock.Release();
         }
-
-        return (prefix, cacheKey);
     }
-    private class FilterValueExtractor : ExpressionVisitor
-    {
-        public Dictionary<string, object> ExtractedValues { get; } = new Dictionary<string, object>();
 
-        protected override Expression VisitBinary(BinaryExpression node)
+    private async Task InvalidateCache(string orgId)
+    {
+        await _lock.WaitAsync();
+        try
         {
-            if (node.NodeType == ExpressionType.Equal || 
-                node.NodeType == ExpressionType.NotEqual ||
-                node.NodeType == ExpressionType.GreaterThan ||
-                node.NodeType == ExpressionType.GreaterThanOrEqual ||
-                node.NodeType == ExpressionType.LessThan ||
-                node.NodeType == ExpressionType.LessThanOrEqual)
+            var pattern = $"{typeof(TEntity).Name}_{orgId}";
+            // Usar reflection para obtener las claves del cache
+            var field = typeof(MemoryCache).GetField("_entries", 
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            var entries = field?.GetValue(_cache) as IDictionary<string, ICacheEntry>;
+            
+            if (entries != null)
             {
-                if (node.Left is MemberExpression memberExpr)
+                foreach (var key in entries.Keys.Where(k => k.StartsWith(pattern)))
                 {
-                    if (node.Right is ConstantExpression constantExpr)
-                    {
-                        ExtractedValues[memberExpr.Member.Name] = constantExpr.Value;
-                    }
-                    else if (node.Right is MemberExpression rightMemberExpr)
-                    {
-                        var rightMember = Expression.Lambda(rightMemberExpr).Compile().DynamicInvoke();
-                        ExtractedValues[memberExpr.Member.Name] = rightMember;
-                    }
+                    _cache.Remove(key);
                 }
             }
-            return base.VisitBinary(node);
         }
-    }
-    
-    private void UpdateLastUpdateTime(string cacheKey, bool consulta)
-    {
-        var now = DateTime.UtcNow;
-        if (!consulta)
+        finally
         {
-            var prefix = cacheKey.Substring(0, cacheKey.IndexOf(':', cacheKey.IndexOf(':')+1)+1);
-            var regsEliminar = _globalCache.Keys.Where(x => x.StartsWith(prefix)).ToList();
-            foreach (var key in regsEliminar)
-            {
-                _globalCache.TryRemove(key, out _);
-            }
+            _lock.Release();
         }
-        _lastUpdateTime[cacheKey] = now;
     }
-    
-    private bool IsCacheValid(string cacheKey, DateTime cacheTime, TimeSpan horaCaduca)
-    {
-        if(_lastUpdateTime.TryGetValue(cacheKey, out var lastUpdate) && lastUpdate > cacheTime)
-        {
-            return false;
-        }
-        return _globalCache.ContainsKey(cacheKey) && (DateTime.UtcNow - cacheTime) < horaCaduca;
-    }
-    private string ElPrefix(string orgId, string tentity) => $"{orgId}:{tentity}";
-    
-*/
-#endregion
 
     //GET
-    public async Task<ApiRespAll<TEntity>> Get(string orgId,
+    public async Task<ApiRespAll<TEntity>> Get(
+        string orgId,
+        ApplicationUser elUser,
         Expression<Func<TEntity, bool>> filtro = null,
         Func<IQueryable<TEntity>, IOrderedQueryable<TEntity>> orderby = null,
-        string propiedades = "", bool byPassCache = false,
-        CancellationToken cancellationToken = default,
-        ApplicationUser elUser = null)
+        string propiedades = "",
+        bool byPassCache = false,
+        CancellationToken cancellationToken = default)
     {
-        var respuesta = new ApiRespAll<TEntity> { Exito = false, Varios = true };
-        
-        try 
+        var cacheKey = GetCacheKey(orgId, typeof(TEntity).Name, elUser, filtro);
+        BorrarTEXTO += cacheKey.cacheKey + " _ ";
+        if (!byPassCache)
         {
-            ValidateUser(elUser);
-            await semaphore.WaitAsync(cancellationToken);
-
-            // BORRAR DESPUÉS - Log para debug
-            await _repoBitacora.AddLog(
-                userId: elUser?.Id ?? "Sistema",
-                orgId: orgId,
-                desc: $"DEBUG: Get - Tipo={typeof(TEntity).Name}, " +
-                      $"OrgId={orgId}, BypassCache={byPassCache}, " +
-                      $"Filtro={filtro?.ToString()}",
-                tipoLog: "Debug",
-                origen: "Repo.Get"
-            );
-
-            // Verificar caché
-            var (prefix, cacheKey) = GetCacheKey(orgId, typeof(TEntity).Name, filtro);
-
-            await _repoBitacora.AddBitacora("Temp", $"va {prefix}, {cacheKey}", "temp1");
-
-            // TEMPORAL - Registro de diagnóstico de caché
-            _cacheKeysHistory.Add($"Time: {DateTime.Now}, Key: {cacheKey}, Hit: {_globalCache.ContainsKey(cacheKey)}");
-            if (_cacheKeysHistory.Count > MAX_HISTORY)
-                _cacheKeysHistory.RemoveAt(0);
-
-            // TEMPORAL - Log de diagnóstico
-            await _repoBitacora.AddLog(
-                userId: elUser?.Id ?? "Sistema",
-                orgId: orgId,
-                desc: $"Cache Keys History:\n{string.Join("\n", _cacheKeysHistory)}",
-                tipoLog: "Debug",
-                origen: "Repo.Get.CacheDebug"
-            );
-
-            if (!byPassCache && _globalCache.TryGetValue(cacheKey, out var cachedResultado))
+            var (found, cached) = await TryGetFromCache<List<TEntity>>(cacheKey.cacheKey);
+            if (found && cached != null)
             {
-                var (cachedRespuesta, cacheTime, horaCaduca) = ((ApiRespAll<TEntity>, DateTime, TimeSpan))cachedResultado;
-                if (IsCacheValid(cacheKey, cacheTime, horaCaduca))
-                {
-                    // BORRAR DESPUÉS - Log para debug
-                    await _repoBitacora.AddLog(
-                        userId: elUser?.Id ?? "Sistema",
-                        orgId: orgId,
-                        desc: $"DEBUG: Cache hit - Key={cacheKey}",
-                        tipoLog: "Debug",
-                        origen: "Repo.Get"
-                    );
-                    return cachedRespuesta;
-                }
+                return new ApiRespAll<TEntity> { Exito = true, DataVarios = cached };
+            }
+        }
+
+        try
+        {
+            IQueryable<TEntity> query = _dbset;
+            if (filtro != null)
+            {
+                query = query.Where(filtro);
             }
 
-            try
+            if (orderby != null)
             {
-                using (var scope = _serviceScopeFactory.CreateScope())
-                {
-                    var dbContext = scope.ServiceProvider.GetRequiredService<TDataContext>();
-                    IQueryable<TEntity> query = dbContext.Set<TEntity>().AsNoTracking();
-
-                    if (filtro != null)
-                    {
-                        query = query.Where(filtro);
-                    }
-
-                    var resultado = await query.ToListAsync(cancellationToken);
-                    respuesta.DataVarios = resultado ?? new List<TEntity>();
-                    
-                    if (resultado == null || !resultado.Any())
-                    {
-                        respuesta.Texto = "No se encontraron resultados.";
-                    }
-                    else if (orgId != "Vacio") 
-                    {
-                        _globalCache[cacheKey] = (respuesta, DateTime.UtcNow, TimeSpan.FromMinutes(Min_actualizar));
-                        UpdateLastUpdateTime(prefix, true);
-                    }
-                    
-                    respuesta.Exito = true;
-                }    
+                query = orderby(query);
             }
-            finally
+
+            var respuesta = new ApiRespAll<TEntity> { Exito = false };
+            respuesta.DataVarios = await query.ToListAsync(cancellationToken);
+            respuesta.Exito = true;
+
+            if (!byPassCache && orgId != "Vacio")
             {
-                semaphore.Release();
+                await SetInCache(cacheKey.cacheKey, respuesta.DataVarios);
             }
+
+            return respuesta;
         }
         catch (Exception ex)
         {
-            respuesta.MsnError.Add($"Error al intentar leer el registro: {ex.Message}");
-            respuesta.Exito = false;
+            await _repoBitacora.AddLog(
+                userId: elUser?.UserId ?? "Sistema",
+                orgId: orgId,
+                desc: $"Error en Get: {ex.Message}",
+                tipoLog: "Error",
+                origen: $"Repo.Get<{typeof(TEntity).Name}>"
+            );
+            return new ApiRespAll<TEntity> { Exito = false, MsnError = new List<string> { ex.Message } };
         }
-
-        return respuesta;
     }
 
     //GetAll
-    public async Task<ApiRespAll<TEntity>> GetAll(ApplicationUser elUser, bool byPassCache = false,
+    public async Task<ApiRespAll<TEntity>> GetAll(
+        ApplicationUser elUser,
+        bool byPassCache = false,
         CancellationToken cancellationToken = default)
     {
-        var respuesta = new ApiRespAll<TEntity> { Exito = false, Varios = true };
-        
-        try 
+        var cacheKey = GetCacheKey(elUser.OrgId, typeof(TEntity).Name, elUser);
+
+        if (!byPassCache)
         {
-            ValidateUser(elUser);
-            
-            // Verificar caché
-            var (prefix, cacheKey) = GetCacheKey(elUser.OrgId, typeof(TEntity).Name);
-            if (!byPassCache && _globalCache.TryGetValue(cacheKey, out var cachedResultado))
+            var (found, cached) = await TryGetFromCache<List<TEntity>>(cacheKey.cacheKey);
+            if (found && cached != null)
             {
-                var (cachedRespuesta, cacheTime, horaCaduca) = ((ApiRespAll<TEntity>, DateTime, TimeSpan)) cachedResultado;
-                if (IsCacheValid(cacheKey, cacheTime, horaCaduca))
-                {
-                    return cachedRespuesta;
-                }
+                return new ApiRespAll<TEntity> { Exito = true, DataVarios = cached };
+            }
+        }
+
+        try
+        {
+            var respuesta = new ApiRespAll<TEntity> { Exito = false };
+            respuesta.DataVarios = await _dbset.ToListAsync(cancellationToken);
+            respuesta.Exito = true;
+
+            if (!byPassCache && elUser.OrgId != "Vacio")
+            {
+                await SetInCache(cacheKey.cacheKey, respuesta.DataVarios);
             }
 
-            await semaphore.WaitAsync(cancellationToken);
-            try
-            {
-                using (var scope = _serviceScopeFactory.CreateScope())
-                {
-                    var dbContext = scope.ServiceProvider.GetRequiredService<TDataContext>();
-                    var resultado = await dbContext.Set<TEntity>().AsNoTracking().ToListAsync(cancellationToken);
-
-                    respuesta.DataVarios = resultado ?? new List<TEntity>();
-
-                    if (resultado == null || !resultado.Any())
-                    {
-                        respuesta.Texto = "No se encontraron resultados.";
-                    }
-                    else 
-                    {
-                        _globalCache[cacheKey] = (respuesta, DateTime.UtcNow, TimeSpan.FromMinutes(Min_actualizar));
-                        UpdateLastUpdateTime(prefix, true);
-                    }
-
-                    respuesta.Exito = true;
-                }
-            }
-            finally
-            {
-                semaphore.Release();
-            }
+            return respuesta;
         }
         catch (Exception ex)
         {
-            respuesta.MsnError.Add($"Error al intentar leer los registros: {ex.Message}");
+            await _repoBitacora.AddLog(
+                userId: elUser.UserId,
+                orgId: elUser.OrgId,
+                desc: $"Error en GetAll: {ex.Message}",
+                tipoLog: "Error",
+                origen: $"Repo.GetAll<{typeof(TEntity).Name}>"
+            );
+            return new ApiRespAll<TEntity> { Exito = false, MsnError = new List<string> { ex.Message } };
         }
-        
-        return respuesta;
-    }      
-    
-    //GetById
-    public virtual async Task<ApiRespAll<TEntity>> GetById(object id, string orgId, 
-            bool byPassCache = false, CancellationToken cancellationToken = default, ApplicationUser elUser = null)
-    {   
-        var respuesta = new ApiRespAll<TEntity> { Exito = false, Varios = true };
-        
-        ValidateUser(elUser);
+    }
 
-        // 1. PRIMERO verificar caché
-        var (prefix, cacheKey) = GetCacheKey(orgId, typeof(TEntity).Name, null, id);
-        if (!byPassCache && _globalCache.TryGetValue(cacheKey, out var cachedResultado))
+    //GetById
+    public async Task<ApiRespAll<TEntity>> GetById(
+        object id,
+        string orgId,
+        ApplicationUser elUser,
+        bool byPassCache = false,
+        CancellationToken cancellationToken = default)
+    {
+        var cacheKey = GetCacheKey(orgId, typeof(TEntity).Name, elUser, null, id);
+
+        if (!byPassCache)
         {
-            var (cachedRespuesta, cacheTime, horaCaduca) = ((ApiRespAll<TEntity>, DateTime, TimeSpan))cachedResultado;
-            if (IsCacheValid(cacheKey, cacheTime, horaCaduca))
+            var (found, cached) = await TryGetFromCache<TEntity>(cacheKey.cacheKey);
+            if (found && cached != null)
             {
-                await _repoBitacora.AddBitacora(
-                    userId: elUser.UserId,
-                    desc: $"GetById: Datos obtenidos desde caché para {typeof(TEntity).Name} id:{id}",
-                    orgId: orgId
-                );
-                return cachedRespuesta;
+                return new ApiRespAll<TEntity> { Exito = true, DataUno = cached };
             }
         }
 
-        if (id == null)
-        {
-            await _repoBitacora.AddBitacora(
-                userId: elUser.UserId,
-                desc: $"Intento de obtener {typeof(TEntity).Name} con ID nulo",
-                orgId: orgId
-            );
-            respuesta.MsnError.Add("El id proporcionado es nulo.");
-            return respuesta;
-        }
-
-        await semaphore.WaitAsync(cancellationToken);
         try
         {
-            var entity = await dbset.FindAsync(new[] { id }, cancellationToken);
-            
+            var respuesta = new ApiRespAll<TEntity> { Exito = false };
+            var entity = await _dbset.FindAsync(new[] { id }, cancellationToken);
             if (entity != null)
             {
                 respuesta.DataUno = entity;
-                
-                // Solo guardar en caché si encontramos el registro
-                if (orgId != "Vacio")
+                respuesta.Exito = true;
+
+                if (!byPassCache)
                 {
-                    _globalCache[cacheKey] = (respuesta, DateTime.UtcNow, TimeSpan.FromMinutes(Min_actualizar));
-                    UpdateLastUpdateTime(prefix, true);
+                    await SetInCache(cacheKey.cacheKey, entity);
                 }
-
-                await _repoBitacora.AddBitacora(
-                    userId: elUser.UserId,
-                    desc: $"Registro {typeof(TEntity).Name} con ID {id} obtenido exitosamente",
-                    orgId: orgId
-                );
             }
-            else
-            {
-                respuesta.Texto = $"No se encontró el registro con ID: {id}";
-                await _repoBitacora.AddBitacora(
-                    userId: elUser.UserId,
-                    desc: $"No se encontró {typeof(TEntity).Name} con ID {id}",
-                    orgId: orgId
-                );
-            }
-
-            // Marcar como exitosa al final si no hubo errores
-            respuesta.Exito = true;
+            return respuesta;
         }
         catch (Exception ex)
         {
-            string exceptionDetails = $"Error al obtener {typeof(TEntity).Name} con ID {id}: ";
-            exceptionDetails += $"Message: {ex.Message}\nStackTrace: {ex.StackTrace}\nData:\n";
-            foreach (var key in ex.Data.Keys)
-            {
-                var value = ex.Data[key];
-                exceptionDetails += $"{key}: {value}\n";
-            }
-            
             await _repoBitacora.AddLog(
                 userId: elUser?.UserId ?? "Sistema",
-                orgId: orgId ?? "Sistema",
-                desc: exceptionDetails,
+                orgId: orgId,
+                desc: $"Error en GetById: {ex.Message}",
                 tipoLog: "Error",
-                origen: $"Repo.{nameof(GetById)}<{typeof(TEntity).Name}>"
+                origen: $"Repo.GetById<{typeof(TEntity).Name}>"
             );
-            respuesta.MsnError.Add($"Error al obtener el registro: {ex.Message}");
-            respuesta.Exito = false;
+            return new ApiRespAll<TEntity> { Exito = false, MsnError = new List<string> { ex.Message } };
         }
-        finally
-        {
-            semaphore.Release();
-        }
-
-        return respuesta;
     }
 
-    
-    private void ValidateUser(ApplicationUser elUser) 
-    {
-        if (elUser == null || string.IsNullOrEmpty(elUser.UserId))
-            throw new InvalidOperationException("Se requiere un usuario válido para esta operación");
-    }
     //Insert
-    public virtual async Task<ApiRespAll<TEntity>> Insert(TEntity entity, string orgId,
-            CancellationToken cancellationToken = default, ApplicationUser elUser = null)
+    public async Task<ApiRespAll<TEntity>> Insert(
+        TEntity entity,
+        string orgId,
+        ApplicationUser elUser,
+        CancellationToken cancellationToken = default)
     {
-        var respuesta = new ApiRespAll<TEntity> {Exito = false, Varios = false};
-        
-        ValidateUser(elUser);
-        
-        if (entity == null)
-        {
-            await _repoBitacora.AddBitacora(
-                userId: elUser.UserId,
-                desc: "Intento de insertar entidad nula",
-                orgId: orgId
-            );
-            respuesta.MsnError.Add("No se proporcionaron datos para insertar.");
-            return respuesta;
-        }  
-
+        var respuesta = new ApiRespAll<TEntity> { Exito = false };
         await semaphore.WaitAsync(cancellationToken);
-        
         try
         {
-            await dbset.AddAsync(entity);
-            await context.SaveChangesAsync();
+            await _dbset.AddAsync(entity, cancellationToken);
+            await _context.SaveChangesAsync(cancellationToken);
+            
+            // Invalidar caché
+            await InvalidateCache(orgId);
             
             respuesta.Exito = true;
             respuesta.DataUno = entity;
             
             await _repoBitacora.AddBitacora(
-                userId: elUser.UserId,
-                desc: $"Se insertó correctamente {typeof(TEntity).Name}",
+                userId: elUser?.UserId ?? "Sistema",
+                desc: $"Se insertó nuevo {typeof(TEntity).Name}",
                 orgId: orgId
             );
-
-            var (prefix, cacheKey) = GetCacheKey(orgId, typeof(TEntity).Name);
-            UpdateLastUpdateTime(prefix, false);
+            
+            return respuesta;
         }
         catch (Exception ex)
         {
-            string exceptionDetails = $"Error al insertar {typeof(TEntity).Name}: ";
-            exceptionDetails += $"Message: {ex.Message}\nStackTrace: {ex.StackTrace}\nData:\n";
-            foreach (var key in ex.Data.Keys)
-            {
-                var value = ex.Data[key];
-                exceptionDetails += $"{key}: {value}\n";
-            }
-            
             await _repoBitacora.AddLog(
                 userId: elUser?.UserId ?? "Sistema",
                 orgId: orgId,
-                desc: exceptionDetails,
+                desc: $"Error en Insert: {ex.Message}",
                 tipoLog: "Error",
-                origen: $"Repo.{nameof(Insert)}<{typeof(TEntity).Name}>"
+                origen: $"Repo.Insert<{typeof(TEntity).Name}>"
             );
-            
-            respuesta.MsnError.Add($"Error al intentar agregar un registro nuevo: {ex.Message}");
+            respuesta.MsnError.Add(ex.Message);
+            return respuesta;
         }
         finally
         {
             semaphore.Release();
         }
-        return respuesta;
     }
 
     //InsertPlus
-    public virtual async Task<ApiRespAll<TEntity>> InsertPlus(
+    public async Task<ApiRespAll<TEntity>> InsertPlus(
         IEnumerable<TEntity> entities,
         string orgId,
-        CancellationToken cancellationToken = default,
-        ApplicationUser elUser = null)
+        ApplicationUser elUser,
+        CancellationToken cancellationToken = default)
     {
-        var respuesta = new ApiRespAll<TEntity> { Exito = false, Varios = true };
-        
-        ValidateUser(elUser);
-        
-        if (entities == null || !entities.Any())
-        {
-            await _repoBitacora.AddBitacora(
-                userId: elUser.UserId,
-                desc: "Intento de insertar colección vacía",
-                orgId: orgId
-            );
-            respuesta.MsnError.Add("No se proporcionaron datos para insertar.");
-            return respuesta;
-        }
-
+        var respuesta = new ApiRespAll<TEntity> { Exito = false };
         await semaphore.WaitAsync(cancellationToken);
         try
         {
-            await dbset.AddRangeAsync(entities);
-            await context.SaveChangesAsync();
+            if (entities == null || !entities.Any())
+            {
+                respuesta.MsnError.Add("No hay entidades para insertar");
+                return respuesta;
+            }
+
+            await _dbset.AddRangeAsync(entities, cancellationToken);
+            await _context.SaveChangesAsync(cancellationToken);
             
+            // Invalidar caché
+            await InvalidateCache(orgId);
+            
+            respuesta.Exito = true;
             respuesta.DataVarios = entities.ToList();
             
             await _repoBitacora.AddBitacora(
-                userId: elUser.UserId,
-                desc: $"Se insertaron correctamente {entities.Count()} registros de {typeof(TEntity).Name}",
+                userId: elUser?.UserId ?? "Sistema",
+                desc: $"Se insertaron {entities.Count()} {typeof(TEntity).Name}",
                 orgId: orgId
             );
-
-            var (prefix, cacheKey) = GetCacheKey(orgId, typeof(TEntity).Name);
-            UpdateLastUpdateTime(prefix, false);
-
-            respuesta.Exito = true;
+            
+            return respuesta;
         }
         catch (Exception ex)
         {
-            string exceptionDetails = $"Error al insertar múltiples {typeof(TEntity).Name}: ";
-            exceptionDetails += $"Message: {ex.Message}\nStackTrace: {ex.StackTrace}\nData:\n";
-            foreach (var key in ex.Data.Keys)
-            {
-                var value = ex.Data[key];
-                exceptionDetails += $"{key}: {value}\n";
-            }
-            
             await _repoBitacora.AddLog(
                 userId: elUser?.UserId ?? "Sistema",
                 orgId: orgId,
-                desc: exceptionDetails,
+                desc: $"Error en InsertPlus: {ex.Message}",
                 tipoLog: "Error",
-                origen: $"Repo.{nameof(InsertPlus)}<{typeof(TEntity).Name}>"
+                origen: $"Repo.InsertPlus<{typeof(TEntity).Name}>"
             );
-            
-            respuesta.MsnError.Add($"Error al intentar agregar los registros: {ex.Message}");
-            respuesta.Exito = false;
+            respuesta.MsnError.Add(ex.Message);
+            return respuesta;
         }
         finally
         {
             semaphore.Release();
         }
-        return respuesta;
     }
     
     //Update
-    public virtual async Task<ApiRespAll<TEntity>> Update(TEntity entity, string orgId,
-            CancellationToken cancellationToken = default, ApplicationUser elUser = null)
+    public virtual async Task<ApiRespAll<TEntity>> Update(
+        TEntity entityToUpdate,
+        string orgId,
+        ApplicationUser elUser,
+        CancellationToken cancellationToken = default)
     {
-        var respuesta = new ApiRespAll<TEntity> {Exito = false, Varios = false};
-        
-        ValidateUser(elUser);
-        
-        if (entity == null)
-        {
-            await _repoBitacora.AddBitacora(
-                userId: elUser.UserId,
-                desc: "Intento de actualizar entidad nula",
-                orgId: orgId
-            );
-            respuesta.MsnError.Add("No se proporcionaron datos para actualizar.");
-            return respuesta;
-        }
-
+        var respuesta = new ApiRespAll<TEntity> { Exito = false };
         await semaphore.WaitAsync(cancellationToken);
         try
         {
-            dbset.Update(entity);
-            await context.SaveChangesAsync();
+            _dbset.Update(entityToUpdate);
+            await _context.SaveChangesAsync(cancellationToken);
             
-            respuesta.DataUno = entity;
+            // Invalidar caché
+            await InvalidateCache(orgId);
+            
+            respuesta.Exito = true;
+            respuesta.DataUno = entityToUpdate;
             
             await _repoBitacora.AddBitacora(
-                userId: elUser.UserId,
-                desc: $"Se actualizó correctamente {typeof(TEntity).Name}",
+                userId: elUser?.UserId ?? "Sistema",
+                desc: $"Se actualizó {typeof(TEntity).Name}",
                 orgId: orgId
             );
-
-            var (prefix, cacheKey) = GetCacheKey(orgId, typeof(TEntity).Name);
-            UpdateLastUpdateTime(prefix, false);
-
-            // Marcar como exitoso al final
-            respuesta.Exito = true;
+            
+            return respuesta;
         }
         catch (Exception ex)
         {
-            string exceptionDetails = $"Error al actualizar {typeof(TEntity).Name}: ";
-            exceptionDetails += $"Message: {ex.Message}\nStackTrace: {ex.StackTrace}\nData:\n";
-            foreach (var key in ex.Data.Keys)
-            {
-                var value = ex.Data[key];
-                exceptionDetails += $"{key}: {value}\n";
-            }
-            
             await _repoBitacora.AddLog(
                 userId: elUser?.UserId ?? "Sistema",
                 orgId: orgId,
-                desc: exceptionDetails,
+                desc: $"Error en Update: {ex.Message}",
                 tipoLog: "Error",
-                origen: $"Repo.{nameof(Update)}<{typeof(TEntity).Name}>"
+                origen: $"Repo.Update<{typeof(TEntity).Name}>"
             );
-            
-            respuesta.MsnError.Add($"Error al intentar actualizar el registro: {ex.Message}");
-            respuesta.Exito = false;
+            respuesta.MsnError.Add(ex.Message);
+            return respuesta;
         }
         finally
         {
             semaphore.Release();
         }
-        return respuesta;
     }
 
     //GetUserId
-    public virtual async Task<ApplicationUser?> GetUserById(string id)
+    public async Task<ApplicationUser?> GetUserById(string id)
     {
-        return await context.Set<ApplicationUser>().Include(nameof(ApplicationUser.Org))
-                    .FirstOrDefaultAsync(e=>e.UserId == id);
+        await semaphore.WaitAsync();
+        try
+        {
+            using var scope = _serviceScopeFactory.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            return await dbContext.Users.FindAsync(id);
+        }
+        catch (Exception ex)
+        {
+            await _repoBitacora.AddLog(
+                userId: "Sistema",
+                orgId: "Sistema",
+                desc: $"Error en GetUserById: {ex.Message}",
+                tipoLog: "Error",
+                origen: $"Repo.GetUserById"
+            );
+            return null;
+        }
+        finally
+        {
+            semaphore.Release();
+        }
     }
 
 
     //UpdateMisDatos
     public virtual async Task<ApiRespAll<TEntity>> UpdateMisDatos(TEntity entityToUpdate,
-            string orgId, CancellationToken cancellationToken = default, ApplicationUser elUser = null)
+            string orgId, ApplicationUser elUser, CancellationToken cancellationToken = default)
     {
         var respuesta = new ApiRespAll<TEntity> { Exito = false, Varios = false };
         
-        ValidateUser(elUser);
-
         if (entityToUpdate == null)
         {
             await _repoBitacora.AddBitacora(
@@ -742,16 +563,16 @@ private int Min_actualizar = 30;
             return respuesta;
         }
 
-        var (prefix, cacheKey) = GetCacheKey(orgId, typeof(TEntity).Name);  
+        var cacheKey = GetCacheKey(orgId, typeof(TEntity).Name, elUser, null, null);
         await semaphore.WaitAsync(cancellationToken);
         
         try
         {
-            var dbSet = context.Set<TEntity>();
+            var dbSet = _context.Set<TEntity>();
             dbSet.Attach(entityToUpdate);
-            context.Entry(entityToUpdate).State = EntityState.Modified;
+            _context.Entry(entityToUpdate).State = EntityState.Modified;
             
-            int affectedRows = await context.SaveChangesAsync(cancellationToken);
+            int affectedRows = await _context.SaveChangesAsync(cancellationToken);
             
             if (affectedRows > 0)
             {
@@ -765,7 +586,7 @@ private int Min_actualizar = 30;
                     orgId: orgId
                 );
 
-                UpdateLastUpdateTime(prefix, false);
+                UpdateLastUpdateTime(cacheKey.cacheKey, false, elUser);
             }
             else
             {
@@ -843,125 +664,120 @@ private int Min_actualizar = 30;
     }
     
     //UpdatePlus
-    public virtual async Task<ApiRespAll<TEntity>> UpdatePlus(
+    public async Task<ApiRespAll<TEntity>> UpdatePlus(
         IEnumerable<TEntity> entities,
         string orgId,
-        CancellationToken cancellationToken = default,
-        ApplicationUser elUser = null)
+        ApplicationUser elUser,
+        CancellationToken cancellationToken = default)
     {
-        var respuesta = new ApiRespAll<TEntity> {Exito = false, Varios = true};
-        
-        ValidateUser(elUser);
-        
-        if (entities == null || !entities.Any())
-        {
-            await _repoBitacora.AddBitacora(
-                userId: elUser.UserId,
-                desc: "Intento de actualizar colección vacía",
-                orgId: orgId
-            );
-            respuesta.MsnError.Add("No se proporcionaron datos para actualizar.");
-            return respuesta;
-        }
-
+        var respuesta = new ApiRespAll<TEntity> { Exito = false };
         await semaphore.WaitAsync(cancellationToken);
         try
         {
-            dbset.UpdateRange(entities);
-            await context.SaveChangesAsync();
+            if (entities == null || !entities.Any())
+            {
+                respuesta.MsnError.Add("No hay entidades para actualizar");
+                return respuesta;
+            }
+
+            _dbset.UpdateRange(entities);
+            await _context.SaveChangesAsync(cancellationToken);
             
+            // Invalidar caché
+            await InvalidateCache(orgId);
+            
+            respuesta.Exito = true;
             respuesta.DataVarios = entities.ToList();
             
             await _repoBitacora.AddBitacora(
-                userId: elUser.UserId,
-                desc: $"Se actualizaron correctamente {entities.Count()} registros de {typeof(TEntity).Name}",
+                userId: elUser?.UserId ?? "Sistema",
+                desc: $"Se actualizaron {entities.Count()} {typeof(TEntity).Name}",
                 orgId: orgId
             );
-
-            var (prefix, cacheKey) = GetCacheKey(orgId, typeof(TEntity).Name);
-            UpdateLastUpdateTime(prefix, false);
-
-            // Marcar como exitoso al final
-            respuesta.Exito = true;
+            
+            return respuesta;
         }
         catch (Exception ex)
         {
-            string exceptionDetails = $"Error al actualizar múltiples {typeof(TEntity).Name}: ";
-            exceptionDetails += $"Message: {ex.Message}\nStackTrace: {ex.StackTrace}\nData:\n";
-            foreach (var key in ex.Data.Keys)
-            {
-                var value = ex.Data[key];
-                exceptionDetails += $"{key}: {value}\n";
-            }
-            
             await _repoBitacora.AddLog(
                 userId: elUser?.UserId ?? "Sistema",
                 orgId: orgId,
-                desc: exceptionDetails,
+                desc: $"Error en UpdatePlus: {ex.Message}",
                 tipoLog: "Error",
-                origen: $"Repo.{nameof(UpdatePlus)}<{typeof(TEntity).Name}>"
+                origen: $"Repo.UpdatePlus<{typeof(TEntity).Name}>"
             );
-            
-            respuesta.MsnError.Add($"Error al intentar actualizar los registros: {ex.Message}");
-            respuesta.Exito = false;
+            respuesta.MsnError.Add(ex.Message);
+            return respuesta;
         }
         finally
         {
             semaphore.Release();
         }
-        return respuesta;
     }
 
     //DeletePLus
 
     //GetCount
-    public virtual async Task<int> GetCount(string orgId, Expression<Func<TEntity, bool>> filtro = null,
-        bool byPassCache = false, CancellationToken cancellationToken = default, ApplicationUser elUser = null)
+    public async Task<int> GetCount(
+        string orgId,
+        ApplicationUser elUser,
+        Expression<Func<TEntity, bool>> filtro = null,
+        bool byPassCache = false,
+        CancellationToken cancellationToken = default)
     {
-        int respuesta = -1;
-        var (Prefix, cacheKey) = GetCacheKey(orgId, "Z900_Bitacora", filtro);
-        if(!byPassCache && _globalCache.TryGetValue(cacheKey, out var cachedResultado))
-        {
-            var (cachedRespuesta, cacheTime, horaCaduca) = ((int, DateTime, TimeSpan)) cachedResultado;
-            if (IsCacheValid(cacheKey, cacheTime, horaCaduca))
-            {
-                return cachedRespuesta;
-            }
-        }
         await semaphore.WaitAsync(cancellationToken);
         try
         {
-            var dbSet = context.Set<TEntity>();
-            IQueryable<TEntity> querry = dbset;
+            var parameters = new Dictionary<string, object>();
             if (filtro != null)
             {
-                querry = querry.Where(filtro);
+                var extractor = new FilterValueExtractor();
+                extractor.Visit(filtro);
+                foreach (var param in extractor.ExtractedValues)
+                {
+                    parameters[param.Key] = param.Value;
+                }
             }
 
-            int count = await querry.CountAsync();
+            var cacheKey = $"count_{GetCacheKey(orgId, typeof(TEntity).Name, elUser, filtro, null).cacheKey}";
 
-            _globalCache[cacheKey] = (respuesta, DateTime.UtcNow, TimeSpan.FromMinutes(Min_actualizar));
-            UpdateLastUpdateTime(Prefix, true);
-            return count;
-        }
-        catch (Exception ex)
-        {
-            string exceptionDetails = $"Error al intentar contar numero de registros, ";
-            exceptionDetails += $"Message: {ex.Message}\nStackTrace: {ex.StackTrace}\nData:\n";
-            foreach (var key in ex.Data.Keys)
+            if (!byPassCache)
             {
-                var value = ex.Data[key];
-                exceptionDetails += $"{key}: {value}\n";
+                var (found, cached) = await TryGetFromCacheInt(cacheKey);
+                if (found)
+                {
+                    return cached;
+                }
             }
-            
-            await _repoBitacora.AddLog(
-                userId: elUser?.UserId ?? "Usuario NO identificado",
-                orgId: orgId ?? "Sistema",
-                desc: exceptionDetails,
-                tipoLog: "Error",
-                origen: $"Repo.{nameof(GetCount)}<{typeof(TEntity).Name}>"
-            );
-            return -1;
+
+            try
+            {
+                IQueryable<TEntity> query = _dbset;
+                if (filtro != null)
+                {
+                    query = query.Where(filtro);
+                }
+
+                var count = await query.CountAsync(cancellationToken);
+
+                if (!byPassCache)
+                {
+                    await SetInCache(cacheKey, count);
+                }
+
+                return count;
+            }
+            catch (Exception ex)
+            {
+                await _repoBitacora.AddLog(
+                    userId: elUser?.UserId ?? "Sistema",
+                    orgId: orgId,
+                    desc: $"Error en GetCount: {ex.Message}",
+                    tipoLog: "Error",
+                    origen: $"Repo.GetCount<{typeof(TEntity).Name}>"
+                );
+                return 0;
+            }
         }
         finally
         {
@@ -969,56 +785,62 @@ private int Min_actualizar = 30;
         }
     }
 
-    public async Task<bool> DeleteEntity(TEntity entityToDel, ApplicationUser elUser)
+    public async Task<bool> DeleteEntity(
+        TEntity entityToDel,
+        ApplicationUser elUser)
     {
-        try 
+        await semaphore.WaitAsync();
+        try
         {
-            // Validación de usuario
-            ValidateUser(elUser);
-
             if (entityToDel == null)
             {
-                await _repoBitacora.AddBitacora(
+                await _repoBitacora.AddLog(
                     userId: elUser.UserId,
-                    desc: $"Intento de eliminar entidad {typeof(TEntity).Name} nula",
-                    orgId: elUser.OrgId
+                    orgId: elUser.OrgId,
+                    desc: "Intento de eliminar entidad nula",
+                    tipoLog: "Error",
+                    origen: $"Repo.DeleteEntity<{typeof(TEntity).Name}>"
                 );
                 return false;
             }
 
-            // Obtener OrgId de la entidad de forma segura
-            var orgIdProperty = typeof(TEntity).GetProperty("OrgId");
-            string orgId = orgIdProperty?.GetValue(entityToDel)?.ToString() ?? elUser.OrgId;
-
-            // Usar el método completo que ya tiene toda la lógica de seguridad
-            return await DeleteEntity(entityToDel, orgId, default, elUser);
+            _dbset.Remove(entityToDel);
+            await _context.SaveChangesAsync();
+            
+            // Invalidar caché
+            await InvalidateCache(elUser.OrgId);
+            
+            await _repoBitacora.AddBitacora(
+                userId: elUser.UserId,
+                desc: $"Se eliminó {typeof(TEntity).Name}",
+                orgId: elUser.OrgId
+            );
+            
+            return true;
         }
         catch (Exception ex)
         {
-            string exceptionDetails = $"Error al eliminar {typeof(TEntity).Name}: ";
-            exceptionDetails += $"Message: {ex.Message}\nStackTrace: {ex.StackTrace}\nData:\n";
-            foreach (var key in ex.Data.Keys)
-            {
-                var value = ex.Data[key];
-                exceptionDetails += $"{key}: {value}\n";
-            }
-            
             await _repoBitacora.AddLog(
-                userId: elUser?.UserId ?? "Sistema",
-                orgId: elUser?.OrgId ?? "Sistema",
-                desc: exceptionDetails,
+                userId: elUser.UserId,
+                orgId: elUser.OrgId,
+                desc: $"Error en DeleteEntity: {ex.Message}",
                 tipoLog: "Error",
-                origen: $"Repo.{nameof(DeleteEntity)}<{typeof(TEntity).Name}>"
+                origen: $"Repo.DeleteEntity<{typeof(TEntity).Name}>"
             );
             return false;
         }
+        finally
+        {
+            semaphore.Release();
+        }
     }
 
-    public virtual async Task<bool> Delete(TEntity entity, string orgId, 
-            CancellationToken cancellationToken = default, ApplicationUser elUser = null)
+    public virtual async Task<bool> Delete(
+        TEntity entity, 
+        string orgId,
+        CancellationToken cancellationToken = default, 
+        ApplicationUser elUser = null)
     {
-        ValidateUser(elUser);
-        
         if (entity == null)
         {
             await _repoBitacora.AddBitacora(
@@ -1032,8 +854,8 @@ private int Min_actualizar = 30;
         await semaphore.WaitAsync(cancellationToken);
         try
         {
-            dbset.Remove(entity);
-            await context.SaveChangesAsync();
+            _dbset.Remove(entity);
+            await _context.SaveChangesAsync();
             
             await _repoBitacora.AddBitacora(
                 userId: elUser.UserId,
@@ -1041,8 +863,8 @@ private int Min_actualizar = 30;
                 orgId: orgId
             );
 
-            var (prefix, cacheKey) = GetCacheKey(orgId, typeof(TEntity).Name);
-            UpdateLastUpdateTime(prefix, false);
+            var cacheKey = GetCacheKey(orgId, typeof(TEntity).Name, elUser, null, null);
+            UpdateLastUpdateTime(cacheKey.cacheKey, false, elUser);
             return true;
         }
         catch (Exception ex)
@@ -1073,8 +895,6 @@ private int Min_actualizar = 30;
     public async Task<bool> DeleteEntity(object id, string orgId, 
             CancellationToken cancellationToken = default, ApplicationUser elUser = null)
     {
-        ValidateUser(elUser);
-
         if (id == null)
         {
             await _repoBitacora.AddBitacora(
@@ -1085,12 +905,12 @@ private int Min_actualizar = 30;
             return false;
         }
 
-        var (prefix, cacheKey) = GetCacheKey(orgId, typeof(TEntity).Name);
+        var cacheKey = GetCacheKey(orgId, typeof(TEntity).Name, elUser, null, id);
         await semaphore.WaitAsync(cancellationToken);
 
         try
         {
-            var entityToDel = await dbset.FindAsync(new[] { id }, cancellationToken);
+            var entityToDel = await _dbset.FindAsync(new[] { id }, cancellationToken);
             if (entityToDel == null)
             {
                 await _repoBitacora.AddBitacora(
@@ -1101,8 +921,8 @@ private int Min_actualizar = 30;
                 return false;
             }
 
-            dbset.Remove(entityToDel);
-            int result = await context.SaveChangesAsync(cancellationToken);
+            _dbset.Remove(entityToDel);
+            int result = await _context.SaveChangesAsync(cancellationToken);
 
             if (result > 0)
             {
@@ -1111,7 +931,7 @@ private int Min_actualizar = 30;
                     desc: $"Se eliminó correctamente {typeof(TEntity).Name} con ID: {id}",
                     orgId: orgId
                 );
-                UpdateLastUpdateTime(prefix, false);
+                UpdateLastUpdateTime(cacheKey.cacheKey, false, elUser);
                 return true;
             }
 
@@ -1147,5 +967,26 @@ private int Min_actualizar = 30;
         }
     }
 
+    private void UpdateLastUpdateTime(string cacheKey, bool consulta, ApplicationUser elUser)
+    {
+        try
+        {
+            var now = DateTime.UtcNow;
+            if (!consulta)
+            {
+                _cache.Remove(cacheKey);
+            }
+        }
+        catch (Exception ex)
+        {
+            _repoBitacora.AddLog(
+                userId: elUser.UserId,
+                orgId: elUser.OrgId,
+                desc: $"Error en UpdateLastUpdateTime: {ex.Message}",
+                tipoLog: "Error",
+                origen: "Repo.UpdateLastUpdateTime"
+            ).Wait();
+        }
+    }
 }
 

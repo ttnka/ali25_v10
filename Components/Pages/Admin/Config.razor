@@ -19,19 +19,28 @@
             <CascadingValue Value="@CurrentUser">
             <RadzenTabs>
                 <Tabs>
-                    <RadzenTabsItem Text="General">
-                        <h3>Configuración General</h3>
-                        @* Contenido de la pestaña general *@
+                    <RadzenTabsItem Text="Mis datos">
+                        <MisDatos />
                     </RadzenTabsItem>
 
-                    <RadzenTabsItem Text="Proveedores">
-                        <User TipoOrg="Admin" LaOrgId="@(CurrentUser?.OrgId ?? string.Empty)"/>
-                        
+                    <RadzenTabsItem Text="Bitácora">
+                        <BitacoraList />
+                    </RadzenTabsItem>
+
+                    <RadzenTabsItem Text="Configuración">
+                        <ConfigList />
+                    </RadzenTabsItem>
+
+                    <RadzenTabsItem Text="Clientes">
+                        <ClientesList />
+                    </RadzenTabsItem>
+
+                    <RadzenTabsItem Text="Usuarios">
+                        <User TipoOrg="Vacio" LaOrgId="Vacio"/>
                     </RadzenTabsItem>
 
                     <RadzenTabsItem Text="Organizaciones">
-                                <Org TipoOrgParameter="Admin"/>
-                                
+                        <Org TipoOrgParameter="Admin"/>
                     </RadzenTabsItem>
                 </Tabs>
             </RadzenTabs>
@@ -45,3 +54,10 @@
         </div>
     </NotAuthorized>
 </AuthorizeView> 
+
+
+@code {
+    //<User TipoOrg="Admin" LaOrgId="@(CurrentUser?.OrgId ?? string.Empty)"/>
+
+    // 
+    }

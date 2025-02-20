@@ -1,9 +1,6 @@
+@page "/Admin/Org"
 @inherits OrgBase
 @rendermode InteractiveServer
-
-@* TEMPORAL_TEST_INICIO - Inyección para diagnóstico de bitácora *@
-@inject IRepoBitacora RepoBitacora
-@* TEMPORAL_TEST_FIN *@
 
 <PageTitle>Organizaciones</PageTitle>
 
@@ -14,7 +11,7 @@
             <RadzenAccordionItem Text="Agregar Organización" Icon="add_business"
                                CollapseTitle="Cerrar formulario" 
                                ExpandTitle="Agregar nueva organización">
-                <OrgAdd OnOrgCreated="HandleOrgCreated" />
+                <OrgAdd OnOrgCreated="@HandleOrgCreated" />
             </RadzenAccordionItem>
         </Items>
     </RadzenAccordion>
@@ -65,7 +62,7 @@
                        ShowPagingSummary="true"
                        class="rz-shadow-3">
             <Template Context="data1">
-                <User TipoOrg="@data1.Tipo" LaOrgId="@data1.OrgId" ListaEdit="false"  />
+                
             </Template>
             <Columns>
                 <RadzenDataGridColumn TItem="W100_Org" Property="Rfc" Title="RFC" Width="120px">
@@ -248,7 +245,7 @@
                 {
                     throw new Exception(result.Texto);
                 }
-
+                
                 await RepoBitacora.AddBitacora(
                     userId: CurrentUser.Id,
                     desc: $"Se eliminó la organización {org.Comercial}",
@@ -296,7 +293,12 @@
                 throw new Exception($"El RFC {org.Rfc} ya existe en otra organización");
             }
 
-            var result = await RepoOrg.Update(org, CurrentUser.OrgId, elUser: CurrentUser);
+            var result = await RepoOrg.Update(
+                org, 
+                CurrentUser.OrgId,
+                elUser: CurrentUser,
+                cancellationToken: _ctsOperations.Token
+            );
             if (!result.Exito)
             {
                 throw new Exception(result.Texto);
@@ -315,7 +317,7 @@
                 orgId: CurrentUser.OrgId
             );
 
-            await LoadDataByTipo(); // Recargar datos
+            await LoadData(); // Recargar datos
         }
         catch (Exception ex)
         {
@@ -334,4 +336,6 @@
             throw; // Re-lanzar para mostrar error en UI
         }
     }
+
+    
 } 

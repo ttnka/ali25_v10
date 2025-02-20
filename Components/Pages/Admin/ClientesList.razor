@@ -1,0 +1,69 @@
+@inherits ClientesListBase
+
+<div class="container-fluid">
+    <div class="row mb-3 bg-light p-3 rounded">
+        <div class="col-md-6">
+            <h3>Mis Clientes</h3>
+        </div>
+        <div class="col-md-6 text-end">
+            <RadzenButton Click="@(() => gridClientes.Reload())"
+                         Icon="refresh"
+                         ButtonStyle="ButtonStyle.Light"
+                         class="me-2">
+                Refrescar
+            </RadzenButton>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    <RadzenDataGrid @ref="gridClientes"
+                   Data="@clientes"
+                   Count="@count"
+                   AllowFiltering="true"
+                   AllowColumnResize="true"
+                   AllowAlternatingRows="false"
+                   FilterMode="FilterMode.Advanced"
+                   AllowSorting="true"
+                   PageSize="10"
+                   AllowPaging="true"
+                   PagerHorizontalAlign="HorizontalAlign.Left"
+                   ShowPagingSummary="true"
+                   class="rz-shadow-3">
+        <Columns>
+            <RadzenDataGridColumn TItem="W210_Clientes" Property="ClienteOrgId" Title="Cliente" Width="200px">
+                <Template Context="data">
+                    @(orgsDisponibles.FirstOrDefault(o => o.OrgId == data.ClienteOrgId)?.Comercial ?? "")
+                </Template>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="W210_Clientes" Property="Estado" Title="Estado" Width="100px">
+                <Template Context="data">
+                    <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@data.Estado.ToString()" />
+                </Template>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="W210_Clientes" Property="Status" Title="Activo" Width="100px">
+                <Template Context="data">
+                    <RadzenSwitch @bind-Value="@data.Status" Disabled="true" />
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <h4>Agregar Cliente</h4>
+            <RadzenDropDown TValue="string"
+                           Data="@orgsDisponibles.Where(o => !clientes?.Any(c => c.ClienteOrgId == o.OrgId) ?? true)"
+                           TextProperty="Comercial"
+                           ValueProperty="OrgId"
+                           Change=@(args => AddCliente(orgsDisponibles.First(o => o.OrgId == args.ToString())))
+                           Placeholder="Seleccione una organización..."
+                           Style="width: 100%" />
+        </div>
+    </div>
+</div> 

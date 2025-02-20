@@ -15,7 +15,15 @@
 </head>
 
 <body>
-    <Routes />
+    <RadzenComponents>
+        <RadzenLayout>
+            <RadzenDialog />
+            <RadzenNotification />
+            <RadzenTooltip />
+            <RadzenContextMenu />
+            <Routes />
+        </RadzenLayout>
+    </RadzenComponents>
     <script src="_framework/blazor.web.js"></script>
     <script src="_content/Radzen.Blazor/Radzen.Blazor.js?v=@(typeof(Radzen.Colors).Assembly.GetName().Version)"></script>
 </body>

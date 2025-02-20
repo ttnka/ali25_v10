@@ -78,6 +78,7 @@ public class Constantes
         
         
         public const string LosEjercicios = "2024,2025";
+        public const string TiposOrgs = "Admin, Clientes, Proveedores";
 
        
 
