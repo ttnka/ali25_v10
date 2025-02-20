@@ -54,11 +54,11 @@ namespace Ali25_V10.Components.Pages.Admin
         {
             try 
             {
-                Console.WriteLine($"{CurrentUser.UserId}");
+                
                 // TEMPORAL_TEST_INICIO - Diagnóstico de UserBase
                 await RepoBitacora.AddBitacora(
                     userId: "Prueba_USer",
-                    desc: "TEST - Iniciando UserBase",
+                    desc: "",
                     orgId: "Prueba",
                     cancellationToken: _ctsBitacora.Token
                 );
