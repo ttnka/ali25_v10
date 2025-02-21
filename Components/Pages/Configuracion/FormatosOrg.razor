@@ -1,0 +1,55 @@
+@inherits FormatosOrgBase
+
+<div class="container">
+    <div class="row mb-3">
+        <div class="col-12">
+            <h4>Organizaciones para: @Formato?.FormatoNombre</h4>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    <div class="row mb-3">
+        <div class="col-12">
+            <RadzenDropDown @bind-Value="@selectedOrgId"
+                          Data="@organizacionesDisponibles"
+                          TextProperty="Comercial"
+                          ValueProperty="OrgId"
+                          Style="width:100%"
+                          Placeholder="Seleccione una organización..."
+                          Change="@(async(args) => await AgregarOrganizacion(args?.ToString()))" />
+        </div>
+    </div>
+
+    <RadzenDataGrid Data="@organizacionesAsignadas"
+                    AllowFiltering="true"
+                    AllowPaging="true"
+                    PageSize="5"
+                    AllowSorting="true"
+                    class="rz-shadow-3">
+        <Columns>
+            <RadzenDataGridColumn TItem="W100_Org" Property="Comercial" Title="Organización" />
+            <RadzenDataGridColumn TItem="W100_Org" Property="Rfc" Title="RFC" />
+            <RadzenDataGridColumn TItem="W100_Org" Width="70px" Sortable="false" Filterable="false">
+                <Template Context="org">
+                    <RadzenButton Icon="delete"
+                                ButtonStyle="ButtonStyle.Danger"
+                                Variant="Variant.Flat"
+                                Size="ButtonSize.Small"
+                                Click="@(() => QuitarOrganizacion(org))" />
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+
+    <div class="row mt-3">
+        <div class="col-12 text-end">
+            <RadzenButton Click="@(() => DialogService.Close(true))"
+                         Text="Cerrar"
+                         ButtonStyle="ButtonStyle.Light" />
+        </div>
+    </div>
+</div> 

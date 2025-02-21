@@ -1,0 +1,170 @@
+@page "/Configuracion/Formatos"
+@inherits FormatosBase
+@rendermode InteractiveServer
+
+<PageTitle>Formatos</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h3>Formatos</h3>
+                <div>
+                    <RadzenButton Click="@(() => NavigationManager.NavigateTo("/"))"
+                                Icon="arrow_back"
+                                ButtonStyle="ButtonStyle.Secondary"
+                                class="me-2">
+                        Regresar
+                    </RadzenButton>
+                    <RadzenButton Click="@OnCreateRow"
+                                Icon="add"
+                                ButtonStyle="ButtonStyle.Success"
+                                class="me-2">
+                        Nuevo Formato
+                    </RadzenButton>
+                    <RadzenButton Click="@(() => gridFormatos.Reload())"
+                                Icon="refresh"
+                                ButtonStyle="ButtonStyle.Light">
+                        Refrescar
+                    </RadzenButton>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    <RadzenDataGrid @ref="gridFormatos"
+                   Data="@formatos"
+                   Count="@count"
+                   AllowFiltering="true"
+                   AllowColumnResize="true"
+                   AllowAlternatingRows="false"
+                   FilterMode="FilterMode.Advanced"
+                   AllowSorting="true"
+                   PageSize="10"
+                   AllowPaging="true"
+                   PagerHorizontalAlign="HorizontalAlign.Left"
+                   ShowPagingSummary="true"
+                   EditMode="DataGridEditMode.Single"
+                   RowUpdate="@OnUpdateRow"
+                   RowCreate="@OnInsertRow"
+                   LoadingIndicator="true"
+                   IsLoading="@isLoading"
+                   class="rz-shadow-3">
+        <Columns>
+            <RadzenDataGridColumn TItem="W290_Formatos" Property="FormatoNombre" Title="Nombre">
+                <EditTemplate Context="formato">
+                    <RadzenTextBox @bind-Value="formato.FormatoNombre" Style="width:100%" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="W290_Formatos" Property="Descripcion" Title="Descripción">
+                <EditTemplate Context="formato">
+                    <RadzenTextArea @bind-Value="formato.Descripcion" Style="width:100%" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="W290_Formatos" Property="Global" Title="Global" Width="100px">
+                <Template Context="formato">
+                    <RadzenSwitch @bind-Value="formato.Global" Disabled="true" />
+                </Template>
+                <EditTemplate Context="formato">
+                    <RadzenSwitch @bind-Value="formato.Global" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="W290_Formatos" Title="Organizaciones" Width="150px">
+                <Template Context="formato">
+                    @if (formato.Global)
+                    {
+                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="Global" />
+                    }
+                    else
+                    {
+                        var count = formatoOrgs.ContainsKey(formato.FormatoId) ? formatoOrgs[formato.FormatoId].Count : 0;
+                        <div class="d-flex align-items-center">
+                            <span class="me-2">@count org(s)</span>
+                            <RadzenButton Icon="group_add"
+                                        ButtonStyle="ButtonStyle.Secondary"
+                                        Variant="Variant.Flat"
+                                        Size="ButtonSize.Small"
+                                        Click="@(() => ShowOrganizaciones(formato))" />
+                        </div>
+                    }
+                </Template>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="W290_Formatos" Property="Estado" Title="Estado" Width="100px">
+                <Template Context="formato">
+                    <RadzenBadge BadgeStyle="@GetEstadoBadgeStyle(formato.Estado)" 
+                                Text="@GetEstadoText(formato.Estado)" />
+                </Template>
+                <EditTemplate Context="formato">
+                    <RadzenDropDown @bind-Value="formato.Estado"
+                                  Data="@(new[] { 0, 5 })"
+                                  TextProperty="@(v => GetEstadoText(v))"
+                                  ValueProperty="@(v => v)"
+                                  Style="width:100%" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="W290_Formatos" Width="70px" Sortable="false" Filterable="false">
+                <Template Context="formato">
+                    <RadzenButton Icon="edit" 
+                                 ButtonStyle="ButtonStyle.Light"
+                                 Variant="Variant.Flat"
+                                 Size="ButtonSize.Medium"
+                                 Click="@(() => gridFormatos.EditRow(formato))" />
+                </Template>
+                <EditTemplate Context="formato">
+                    <RadzenButton Icon="check" 
+                                 ButtonStyle="ButtonStyle.Success"
+                                 Variant="Variant.Flat"
+                                 Size="ButtonSize.Small"
+                                 Click="@(() => SaveRow(formato))" />
+                    <RadzenButton Icon="close" 
+                                 ButtonStyle="ButtonStyle.Light"
+                                 Variant="Variant.Flat"
+                                 Size="ButtonSize.Small"
+                                 Click="@(() => CancelEdit(formato))" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="W290_Formatos" Width="70px" Sortable="false" Filterable="false">
+                <Template Context="formato">
+                    @if (formato.Status)
+                    {
+                        <RadzenButton Icon="remove_circle"
+                                     ButtonStyle="ButtonStyle.Danger"
+                                     Variant="Variant.Flat"
+                                     Size="ButtonSize.Small"
+                                     Click="@(() => DesactivarFormato(formato))"
+                                     Disabled="@isLoading" />
+                    }
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+</div>
+
+@code {
+    protected BadgeStyle GetEstadoBadgeStyle(int estado) => estado switch
+    {
+        <= 0 => BadgeStyle.Danger,
+        < 5 => BadgeStyle.Warning,
+        5 => BadgeStyle.Success,
+        _ => BadgeStyle.Info
+    };
+
+    protected string GetEstadoText(int estado) => estado switch
+    {
+        <= 0 => "Inactivo",
+        < 5 => "Pendiente",
+        5 => "Activo",
+        _ => "Especial"
+    };
+} 

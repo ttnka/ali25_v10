@@ -62,6 +62,11 @@ builder.Services.AddTransient<IRepo<W180_Files>, Repo<W180_Files, ApplicationDbC
 builder.Services.AddTransient<IRepo<ApplicationUser>, Repo<ApplicationUser, ApplicationDbContext>>();
 builder.Services.AddTransient<IRepo<ZConfig>, Repo<ZConfig, BitacoraDbContext>>();
 builder.Services.AddTransient<IRepo<W210_Clientes>, Repo<W210_Clientes, ApplicationDbContext>>();
+builder.Services.AddTransient<IRepo<W290_Formatos>, Repo<W290_Formatos, ApplicationDbContext>>();
+builder.Services.AddTransient<IRepo<W291_FormatoGpo>, Repo<W291_FormatoGpo, ApplicationDbContext>>();
+builder.Services.AddTransient<IRepo<W220_Folios>, Repo<W220_Folios, ApplicationDbContext>>();
+builder.Services.AddTransient<IRepo<W222_FolioDet>, Repo<W222_FolioDet, ApplicationDbContext>>();
+
 // TEMPORAL_TEST_INICIO - Cambio de Transient a Scoped para diagnóstico
 builder.Services.AddScoped<IRepoBitacora, RepoBitacora>();
 // TEMPORAL_TEST_FIN

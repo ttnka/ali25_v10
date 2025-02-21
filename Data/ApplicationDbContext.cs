@@ -7,10 +7,14 @@ namespace Ali25_V10.Data
 {
     public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : IdentityDbContext<ApplicationUser>(options)
     {
-        public DbSet<W100_Org> Organizaciones { get; set; }
-        public DbSet<W180_Files> Archivos { get; set; }
-        public DbSet<W210_Clientes> Clientes { get; set; }
-
+        public DbSet<W100_Org> Organizaciones => Set<W100_Org>();
+        public DbSet<W180_Files> Archivos => Set<W180_Files>();
+        public DbSet<W210_Clientes> Clientes => Set<W210_Clientes>();
+        public DbSet<W290_Formatos> Formatos => Set<W290_Formatos>();
+        public DbSet<W291_FormatoGpo> FormatosGrupos => Set<W291_FormatoGpo>();
+        public DbSet<W220_Folios> Folios => Set<W220_Folios>();
+        public DbSet<W222_FolioDet> FoliosDet => Set<W222_FolioDet>();
+    
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);

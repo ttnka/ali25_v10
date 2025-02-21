@@ -1,0 +1,136 @@
+@page "/Admin/Archivos"
+@inherits ArchivosBase
+@rendermode InteractiveServer
+
+<PageTitle>Archivos</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h3>Archivos</h3>
+                <div>
+                    <InputFile OnChange="@OnFileUpload" 
+                             accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+                             class="d-none" 
+                             id="fileInput" />
+                    <RadzenButton Click="@(() => { })" 
+                                Icon="upload"
+                                ButtonStyle="ButtonStyle.Primary"
+                                class="me-2"
+                                onclick="document.getElementById('fileInput').click();">
+                        Subir Archivo
+                    </RadzenButton>
+                    <RadzenButton Click="@(() => gridFiles.Reload())"
+                                Icon="refresh"
+                                ButtonStyle="ButtonStyle.Light">
+                        Refrescar
+                    </RadzenButton>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    @if (isLoading)
+    {
+        <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+    }
+    else
+    {
+        <RadzenDataGrid @ref="gridFiles"
+                       Data="@files"
+                       Count="@count"
+                       AllowFiltering="true"
+                       AllowColumnResize="true"
+                       AllowAlternatingRows="false"
+                       FilterMode="FilterMode.Advanced"
+                       AllowSorting="true"
+                       PageSize="10"
+                       AllowPaging="true"
+                       PagerHorizontalAlign="HorizontalAlign.Left"
+                       ShowPagingSummary="true"
+                       class="rz-shadow-3">
+            <Columns>
+                <RadzenDataGridColumn TItem="W180_Files" Property="Fecha" Title="Fecha" Width="150px">
+                    <Template Context="file">
+                        @file.Fecha.ToString("dd/MMM/yyyy HH:mm")
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="W180_Files" Property="Archivo" Title="Archivo">
+                    <Template Context="file">
+                        <div class="d-flex align-items-center">
+                            <i class="@GetFileIcon(file.Tipo) me-2"></i>
+                            @file.Archivo
+                        </div>
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="W180_Files" Property="Fuente" Title="Origen" Width="120px">
+                    <Template Context="file">
+                        @file.Fuente
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="W180_Files" Property="Estado" Title="Estado" Width="100px">
+                    <Template Context="file">
+                        <RadzenBadge BadgeStyle="@GetEstadoBadgeStyle(file.Estado)" 
+                                    Text="@GetEstadoText(file.Estado)" />
+                    </Template>
+                </RadzenDataGridColumn>
+
+                
+            </Columns>
+        </RadzenDataGrid>
+    }
+</div>
+
+@code {
+    protected string GetFileIcon(string fileType)
+    {
+        return fileType?.ToLower() switch
+        {
+            var t when t?.Contains("pdf") == true => "bi bi-file-pdf",
+            var t when t?.Contains("image") == true => "bi bi-file-image",
+            var t when t?.Contains("word") == true => "bi bi-file-word",
+            var t when t?.Contains("excel") == true => "bi bi-file-excel",
+            _ => "bi bi-file-earmark"
+        };
+    }
+
+    protected string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        int order = 0;
+        double size = bytes;
+        while (size >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            size /= 1024;
+        }
+        return $"{size:0.##} {sizes[order]}";
+    }
+
+    protected string GetEstadoText(int estado) => estado switch
+    {
+        <= 0 => "Eliminado",
+        < 5 => "Pendiente",
+        5 => "Activo",
+        _ => "Especial"
+    };
+
+    protected BadgeStyle GetEstadoBadgeStyle(int estado) => estado switch
+    {
+        <= 0 => BadgeStyle.Danger,
+        < 5 => BadgeStyle.Warning,
+        5 => BadgeStyle.Success,
+        _ => BadgeStyle.Info
+    };
+
+    
+} 

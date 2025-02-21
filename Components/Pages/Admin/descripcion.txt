@@ -178,4 +178,86 @@ COMPONENTES DEL SISTEMA:
 CAMBIOS PENDIENTES:
 - Backup creado de Repo.cs
 - Implementación de nuevo sistema de caché
-- Punto de restauración establecido 
+- Punto de restauración establecido
+
+8. COMPONENTES DE ADMINISTRACIÓN
+
+- ConfigList.razor y ConfigListBase.cs
+  Ubicación: Ali25_V10/Components/Pages/Admin/
+  Propósito: Gestión de configuraciones del sistema
+  Estado: Funcional
+  Dependencias:
+    - IRepo<ZConfig>: required
+    - IRepoBitacora: required
+    - DialogService: Para ayuda contextual
+  Características:
+    - Filtrado por tipo (Grupo/Elemento)
+    - Filtrado por organización
+    - Manejo de estados con badges
+    - Toggle para mostrar/ocultar inactivos
+    - Sistema de ayuda contextual
+
+- BitacoraList.razor y BitacoraListBase.cs
+  Ubicación: Ali25_V10/Components/Pages/Admin/
+  Propósito: Visualización y filtrado de bitácora
+  Estado: Funcional
+  Dependencias:
+    - IRepoBitacora: required
+    - IRepo<W100_Org>: required
+    - IRepo<ApplicationUser>: required
+  Características:
+    - Filtrado por fecha (puntual y rangos)
+    - Filtrado por organización y usuario
+    - Búsqueda en descripción
+    - Paginación y ordenamiento
+    - Vista detallada de eventos
+
+- ClientesList.razor y ClientesListBase.cs
+  Ubicación: Ali25_V10/Components/Pages/Admin/
+  Propósito: Gestión de relaciones cliente-proveedor
+  Estado: Funcional
+  Dependencias:
+    - IRepo<W210_Clientes>: required
+    - IRepo<W100_Org>: required
+    - IRepoBitacora: required
+  Características:
+    - Listado de clientes por organización
+    - Manejo de estados y status
+    - Agregar/Remover relaciones cliente
+    - Validaciones de permisos por nivel
+
+- MisDatos.razor y MisDatosBase.cs
+  Ubicación: Ali25_V10/Components/Pages/Admin/
+  Propósito: Gestión de datos personales del usuario
+  Estado: Funcional
+  Dependencias:
+    - UserManager<ApplicationUser>: required
+    - IRepoBitacora: required
+    - IRepo<W100_Org>: required
+  Características:
+    - Actualización de datos personales
+    - Cambio de contraseña seguro
+    - Validaciones en tiempo real
+    - Visualización de datos de organización
+    - Manejo de errores con feedback
+
+ESTADO ACTUAL DEL SISTEMA:
+- Problemas identificados:
+  * Caché no mantiene consistencia
+  * Bitácoras no se escriben correctamente
+  * Posibles problemas de inyección de dependencias
+  * Necesidad de implementar CancellationTokens en nuevos componentes
+
+- Próximos pasos:
+  * Diagnóstico de caché en Repo.cs
+  * Verificación de bitácoras
+  * Implementar IDisposable en nuevos componentes
+  * Revisar manejo de errores en componentes nuevos
+
+ÚLTIMA ACTUALIZACIÓN: 01/Mar/2024
+
+CAMBIOS PENDIENTES:
+- Backup creado de Repo.cs
+- Implementación de nuevo sistema de caché
+- Punto de restauración establecido
+- Implementar CancellationTokens en componentes nuevos 
