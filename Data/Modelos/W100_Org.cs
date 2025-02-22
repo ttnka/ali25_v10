@@ -45,11 +45,6 @@ public class W100_Org
             Users.Add(user);
             user.Org = this;
         }
-        public virtual ICollection<Z900_Bitacora> Bitacoras { get; set; } = new List<Z900_Bitacora>();
-        public void BitacoraAdd(Z900_Bitacora bita)
-        {
-            Bitacoras.Add(bita);
-            bita.Org = this;
-        }
+        
     
     }

@@ -1,0 +1,115 @@
+@page "/Configuracion/FormatoDetalle/{FormatoId}"
+@inherits FormatoDetalleBase
+@rendermode InteractiveServer
+
+<PageTitle>Detalle del Formato</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h3>Campos del Formato - @formato?.FormatoNombre</h3>
+                <div>
+                    <RadzenButton Click="@(() => NavigationManager.NavigateTo("/Configuracion/Formatos"))"
+                                Icon="arrow_back"
+                                ButtonStyle="ButtonStyle.Secondary"
+                                class="me-2">
+                        Regresar
+                    </RadzenButton>
+                    <RadzenButton Click="@InsertRow"
+                                Icon="add"
+                                ButtonStyle="ButtonStyle.Success"
+                                class="me-2">
+                        Nuevo Campo
+                    </RadzenButton>
+                    <RadzenButton Click="@(() => gridFormatoDet.Reload())"
+                                Icon="refresh"
+                                ButtonStyle="ButtonStyle.Light">
+                        Refrescar
+                    </RadzenButton>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    <RadzenDataGrid @ref="gridFormatoDet"
+                   Data="@formatoDetalles"
+                   TItem="W292_FormatoDet"
+                   Count="@count"
+                   AllowFiltering="true"
+                   AllowColumnResize="true"
+                   AllowAlternatingRows="false"
+                   AllowSorting="true"
+                   PageSize="10"
+                   AllowPaging="true"
+                   PagerHorizontalAlign="HorizontalAlign.Left"
+                   ShowPagingSummary="true"
+                   EditMode="DataGridEditMode.Single"
+                   RowCreate="@OnCreateRow"
+                   RowUpdate="@OnUpdateRow"
+                   class="rz-shadow-3">
+        <Columns>
+            <RadzenDataGridColumn TItem="W292_FormatoDet" Property="Orden" Title="Orden" Width="80px">
+                <EditTemplate Context="detalle">
+                    <RadzenNumeric @bind-Value="detalle.Orden" Style="width:100%" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="W292_FormatoDet" Property="Tipo" Title="Tipo" Width="120px">
+                <EditTemplate Context="detalle">
+                    <RadzenDropDown @bind-Value="detalle.Tipo"
+                                  Data="@tiposCampo"
+                                  Style="width:100%" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="W292_FormatoDet" Property="Campo" Title="Campo">
+                <EditTemplate Context="detalle">
+                    <RadzenTextBox @bind-Value="detalle.Campo" Style="width:100%" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="W292_FormatoDet" Property="Descripcion" Title="Descripción">
+                <EditTemplate Context="detalle">
+                    <RadzenTextArea @bind-Value="detalle.Descripcion" Style="width:100%" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="W292_FormatoDet" Property="Estado" Title="Estado" Width="100px">
+                <Template Context="detalle">
+                    <RadzenLabel Text="@(detalle.Estado == 5 ? "Activo" : "Pendiente")" />
+                </Template>
+                <EditTemplate Context="detalle">
+                    
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="W292_FormatoDet" Width="70px" Sortable="false" Filterable="false">
+                <Template Context="detalle">
+                    <RadzenButton Icon="edit"
+                                ButtonStyle="ButtonStyle.Light"
+                                Variant="Variant.Flat"
+                                Size="ButtonSize.Medium"
+                                Click="@(() => gridFormatoDet.EditRow(detalle))" />
+                </Template>
+                <EditTemplate Context="detalle">
+                    <RadzenButton Icon="check"
+                                ButtonStyle="ButtonStyle.Success"
+                                Variant="Variant.Flat"
+                                Size="ButtonSize.Small"
+                                Click="@(() => SaveRow(detalle))" />
+                    <RadzenButton Icon="close"
+                                ButtonStyle="ButtonStyle.Light"
+                                Variant="Variant.Flat"
+                                Size="ButtonSize.Small"
+                                Click="@(() => CancelEdit(detalle))" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+</div> 

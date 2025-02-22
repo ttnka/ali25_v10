@@ -6,6 +6,16 @@ REGLAS DE OPERACIÓN PARA CAMBIOS DE CÓDIGO:
   * Usar IRepoBitacora.AddLog para diagnóstico
   * Remover/ignorar cualquier referencia a ILogger
 
+- NO usar DialogService:
+  * Cada componente debe ser independiente
+  * No usar ventanas modales/diálogos
+  * Usar navegación entre páginas en su lugar
+
+- NO usar RadzenBadge:
+  * Usar RadzenLabel para mostrar estados/etiquetas
+  * No usar badges para indicadores visuales
+  * Mantener diseño simple y consistente
+
 - Manejo de CancellationTokens:
   * Operaciones: 30 segundos (_ctsOperations)
   * Bitácoras: 5 segundos (_ctsBitacora)
@@ -32,7 +42,26 @@ REGLAS DE OPERACIÓN PARA CAMBIOS DE CÓDIGO:
 - Verificar funcionamiento antes y después de cada cambio
 - Mantener respaldo de archivos críticos antes de modificarlos
 
-4. ARCHIVOS CRÍTICOS
+4. ESTRUCTURA DE COMPONENTES
+- Cada componente es independiente:
+  * No compartir estado entre componentes
+  * No usar servicios compartidos
+  * Usar navegación para comunicación entre componentes
+  * Cada componente maneja su propia carga de datos
+
+5. DISEÑO DE INTERFAZ
+- Usar RadzenLabel en lugar de RadzenBadge
+- Mantener consistencia visual
+- Evitar elementos decorativos innecesarios
+- Priorizar funcionalidad sobre estética
+
+6. MANEJO DE DATOS
+- Usar IRepo<T> para acceso a datos
+- Implementar caché por componente
+- Validar permisos en cada operación
+- Registrar bitácoras para diagnóstico
+
+7. ARCHIVOS CRÍTICOS
 - Z900_Bitacora.cs
 - IRepoBitacora.cs
 - RepoBitacora.cs
@@ -40,15 +69,43 @@ REGLAS DE OPERACIÓN PARA CAMBIOS DE CÓDIGO:
 - OrgBase.cs
 - UserBase.cs
 
-5. PROCESO DE COMMIT
+8. PROCESO DE COMMIT
 - Repositorio: github.com/ttnka
 - Documentar cambios en commit message
 - Incluir archivos modificados
 - Incluir propósito del cambio
 
-6. ERRORES ACTUALES
+9. ERRORES ACTUALES
 - Problema con caché en Repo.cs
 - Bitácoras no se escriben
 - Necesidad de diagnóstico sistemático
 
 ÚLTIMA ACTUALIZACIÓN: [Fecha y hora] 
+
+PROTOCOLO DE CAMBIOS:
+
+1. ANÁLISIS PREVIO
+- Listar archivos afectados
+- Mostrar contenido actual de cada archivo
+- Esperar confirmación del usuario
+
+2. PROPUESTA DE CAMBIOS
+- Mostrar cambios específicos para cada archivo
+- Un archivo a la vez
+- Esperar aprobación antes de proceder
+
+3. EJECUCIÓN
+- Aplicar solo los cambios aprobados
+- Confirmar cada cambio realizado
+- No tocar archivos no autorizados
+
+4. VERIFICACIÓN
+- Mostrar estado final de cada archivo modificado
+- Confirmar que no se tocaron otros archivos
+- Esperar validación del usuario
+
+[REGLA DE ORO]
+- NO hacer cambios no solicitados
+- NO asumir cambios adicionales
+- NO modificar archivos sin autorización
+- SIEMPRE mostrar el antes y después

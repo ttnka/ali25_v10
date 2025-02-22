@@ -60,7 +60,7 @@ builder.Services.AddTransient<IRepo<W100_Org>, Repo<W100_Org, ApplicationDbConte
 builder.Services.AddTransient<IRepo<W180_Files>, Repo<W180_Files, ApplicationDbContext>>();
 
 builder.Services.AddTransient<IRepo<ApplicationUser>, Repo<ApplicationUser, ApplicationDbContext>>();
-builder.Services.AddTransient<IRepo<ZConfig>, Repo<ZConfig, BitacoraDbContext>>();
+builder.Services.AddTransient<IRepo<WConfig>, Repo<WConfig, BitacoraDbContext>>();
 builder.Services.AddTransient<IRepo<W210_Clientes>, Repo<W210_Clientes, ApplicationDbContext>>();
 builder.Services.AddTransient<IRepo<W290_Formatos>, Repo<W290_Formatos, ApplicationDbContext>>();
 builder.Services.AddTransient<IRepo<W291_FormatoGpo>, Repo<W291_FormatoGpo, ApplicationDbContext>>();

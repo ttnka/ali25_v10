@@ -12,7 +12,7 @@ public class FormatosOrgBase : ComponentBase, IDisposable
     [Inject] protected IRepo<W291_FormatoGpo> RepoFormatoGpo { get; set; } = default!;
     [Inject] protected IRepo<W100_Org> RepoOrg { get; set; } = default!;
     [Inject] protected IRepoBitacora RepoBitacora { get; set; } = default!;
-    [Inject] protected DialogService DialogService { get; set; } = default!;
+    //[Inject] protected DialogService DialogService { get; set; } = default!;
 
     [Parameter] public W290_Formatos? Formato { get; set; }
     [Parameter] public List<W100_Org>? OrganizacionesActuales { get; set; }

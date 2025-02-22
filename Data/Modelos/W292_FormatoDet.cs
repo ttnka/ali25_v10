@@ -18,5 +18,16 @@ public class W292_FormatoDet
     public string Descripcion { get; set; } = string.Empty;
     public int Estado { get; set; } = 5;
     public bool Status { get; set; } = true;
+    
+    public W292_FormatoDet(string formatoId, int orden, string tipo, string campo, string descripcion, int estado, bool status, DateTime fechaCaptura)
+    {
+        FormatoId = formatoId;  
+        Orden = orden;
+        Tipo = tipo;
+        Campo = campo;
+        Descripcion = descripcion;
+        Estado = estado;
+        Status = status;
+    }
 }
 

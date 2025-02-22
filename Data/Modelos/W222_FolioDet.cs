@@ -11,5 +11,16 @@ public class W222_FolioDet
     public string Valor { get; set; } = string.Empty;
     public int Estado { get; set; } = 5;
     public bool Status { get; set; } = true;
+    
 
+    public W222_FolioDet(string folioId, string campo, string valor, 
+            int estado, bool status)
+    {
+        FolioId = folioId;
+        Campo = campo;
+        Valor = valor;
+        Estado = estado;
+        Status = status;
+        
+    }
 }

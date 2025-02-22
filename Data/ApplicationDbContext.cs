@@ -5,7 +5,8 @@ using Ali25_V10.Data.Sistema;
 
 namespace Ali25_V10.Data
 {
-    public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : IdentityDbContext<ApplicationUser>(options)
+    public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : 
+        IdentityDbContext<ApplicationUser>(options)
     {
         public DbSet<W100_Org> Organizaciones => Set<W100_Org>();
         public DbSet<W180_Files> Archivos => Set<W180_Files>();
@@ -14,7 +15,7 @@ namespace Ali25_V10.Data
         public DbSet<W291_FormatoGpo> FormatosGrupos => Set<W291_FormatoGpo>();
         public DbSet<W220_Folios> Folios => Set<W220_Folios>();
         public DbSet<W222_FolioDet> FoliosDet => Set<W222_FolioDet>();
-    
+        public DbSet<WConfig> Configuraciones => Set<WConfig>();
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);

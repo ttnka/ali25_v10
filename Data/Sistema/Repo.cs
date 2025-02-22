@@ -33,6 +33,7 @@ public class Repo<TEntity, TDataContext> : IRepo<TEntity>
     // private readonly IRepoLog _repoLog;  // Comentado IRepoLog
 #endregion
 
+#region  Caché
     // TEMPORAL - Diagnóstico de caché
     private static List<string> _cacheKeysHistory = new();
     private const int MAX_HISTORY = 10;
@@ -224,6 +225,8 @@ public class Repo<TEntity, TDataContext> : IRepo<TEntity>
             _lock.Release();
         }
     }
+
+    #endregion
 
     //GET
     public async Task<ApiRespAll<TEntity>> Get(

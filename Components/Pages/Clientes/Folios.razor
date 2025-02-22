@@ -1,0 +1,137 @@
+@page "/Clientes/Folios"
+@inherits FoliosBase
+@rendermode InteractiveServer
+
+<PageTitle>Folios</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h3>Folios</h3>
+                <div>
+                    <RadzenButton Click="@InsertRow"
+                                Icon="add"
+                                ButtonStyle="ButtonStyle.Success"
+                                class="me-2">
+                        Nuevo Folio
+                    </RadzenButton>
+                    <RadzenButton Click="@(() => gridFolios.Reload())"
+                                Icon="refresh"
+                                ButtonStyle="ButtonStyle.Light">
+                        Refrescar
+                    </RadzenButton>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    <RadzenDataGrid @ref="gridFolios"
+                   TItem="W220_Folios"
+                   Data="@folios"
+                   Count="@count"
+                   AllowFiltering="true"
+                   AllowColumnResize="true"
+                   AllowAlternatingRows="false"
+                   FilterMode="FilterMode.Advanced"
+                   AllowSorting="true"
+                   PageSize="10"
+                   AllowPaging="true"
+                   PagerHorizontalAlign="HorizontalAlign.Left"
+                   ShowPagingSummary="true"
+                   EditMode="DataGridEditMode.Single"
+                   RowCreate="@OnCreateRow"
+                   RowUpdate="@OnUpdateRow"
+                   class="rz-shadow-3">
+        <Columns>
+            <RadzenDataGridColumn TItem="W220_Folios" Property="Folio" Title="Folio" Width="100px" />
+ 
+            <RadzenDataGridColumn TItem="W220_Folios" Property="FechaFolio" Title="Fecha" Width="150px">
+                <Template Context="data">
+                    @data.FechaFolio.ToString("dd/MM/yyyy")
+                </Template>
+                <EditTemplate Context="data">
+                    <RadzenDatePicker @bind-Value="data.FechaFolio" 
+                                    DateFormat="dd/MM/yyyy"
+                                    Style="width:100%" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="W220_Folios" Property="ClienteId" Title="Cliente">
+                <Template Context="data">
+                   <RadzenLabel Text="Arreglar  " />
+                </Template>
+                <EditTemplate Context="data">
+                    <RadzenDropDown @bind-Value="data.ClienteId"
+                                  Data="@clientes"
+                                  TextProperty="ClienteNombre"
+                                  ValueProperty="ClienteId"
+                                  Style="width:100%"
+                                  FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                  AllowFiltering="true"
+                                  Placeholder="Seleccione un cliente..." />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="W220_Folios" Property="FormatoId" Title="Formato">
+                <Template Context="data">
+                    @(formatos?.FirstOrDefault(f => f.FormatoId == data.FormatoId)?.FormatoNombre ?? "")
+                </Template>
+                <EditTemplate Context="data">
+                    <RadzenDropDown @bind-Value="data.FormatoId"
+                                  Data="@formatos"
+                                  TextProperty="FormatoNombre"
+                                  ValueProperty="FormatoId"
+                                  Style="width:100%"
+                                  FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                  AllowFiltering="true"
+                                  Placeholder="Seleccione un formato..." />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="W220_Folios" Property="Estado" Title="Estado" Width="100px">
+                <Template Context="data">
+                    <RadzenLabel Text="@(data.Estado == 5 ? "Activo" : "Pendiente")" />
+                                
+                </Template>
+                <EditTemplate Context="data">
+                    
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="W220_Folios" Width="160px" Sortable="false" Filterable="false">
+                <Template Context="data">
+                    <RadzenButton Icon="edit"
+                                ButtonStyle="ButtonStyle.Light"
+                                Variant="Variant.Flat"
+                                Size="ButtonSize.Medium"
+                                Click="@(() => EditRow(data))"
+                                class="me-1" />
+                    <RadzenButton Icon="list"
+                                ButtonStyle="ButtonStyle.Info"
+                                Variant="Variant.Flat"
+                                Size="ButtonSize.Medium"
+                                Click="@(() => NavigationManager.NavigateTo($"/Clientes/FolioDetalle/{data.FolioId}"))" />
+                </Template>
+                <EditTemplate Context="data">
+                    <RadzenButton Icon="check"
+                                ButtonStyle="ButtonStyle.Success"
+                                Variant="Variant.Flat"
+                                Size="ButtonSize.Small"
+                                Click="@(() => SaveRow(data))"
+                                class="me-1" />
+                    <RadzenButton Icon="close"
+                                ButtonStyle="ButtonStyle.Light"
+                                Variant="Variant.Flat"
+                                Size="ButtonSize.Small"
+                                Click="@(() => CancelEdit(data))" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+</div> 

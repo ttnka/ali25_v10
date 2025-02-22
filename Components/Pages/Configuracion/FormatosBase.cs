@@ -131,7 +131,7 @@ public class FormatosBase : ComponentBase, IDisposable
                 status: true
             );
 
-            gridFormatos.InsertRow(newFormato);
+            await gridFormatos.InsertRow(newFormato);
         }
         catch (Exception ex)
         {
@@ -143,7 +143,7 @@ public class FormatosBase : ComponentBase, IDisposable
     {
         try
         {
-            gridFormatos.UpdateRow(formato);
+             gridFormatos.UpdateRow(formato);
         }
         catch (Exception ex)
         {

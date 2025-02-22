@@ -40,6 +40,7 @@
     <RadzenDataGrid @ref="gridFormatos"
                    Data="@formatos"
                    Count="@count"
+                   TItem="W290_Formatos"
                    AllowFiltering="true"
                    AllowColumnResize="true"
                    AllowAlternatingRows="false"
@@ -100,15 +101,11 @@
 
             <RadzenDataGridColumn TItem="W290_Formatos" Property="Estado" Title="Estado" Width="100px">
                 <Template Context="formato">
-                    <RadzenBadge BadgeStyle="@GetEstadoBadgeStyle(formato.Estado)" 
-                                Text="@GetEstadoText(formato.Estado)" />
+                    <RadzenLabel Text="CAMBIALO" />
+                                
                 </Template>
                 <EditTemplate Context="formato">
-                    <RadzenDropDown @bind-Value="formato.Estado"
-                                  Data="@(new[] { 0, 5 })"
-                                  TextProperty="@(v => GetEstadoText(v))"
-                                  ValueProperty="@(v => v)"
-                                  Style="width:100%" />
+                    
                 </EditTemplate>
             </RadzenDataGridColumn>
 

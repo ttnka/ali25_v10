@@ -229,36 +229,226 @@ namespace Ali25_V10.Data.Migrations.Application
                     b.ToTable("Archivos");
                 });
 
-            modelBuilder.Entity("Ali25_V10.Data.Modelos.Z900_Bitacora", b =>
+            modelBuilder.Entity("Ali25_V10.Data.Modelos.W210_Clientes", b =>
                 {
-                    b.Property<string>("BitacoraId")
+                    b.Property<string>("ClienteId")
                         .HasMaxLength(65)
                         .HasColumnType("varchar(65)");
 
-                    b.Property<string>("Desc")
+                    b.Property<string>("ClienteOrgId")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasMaxLength(65)
+                        .HasColumnType("varchar(65)");
 
-                    b.Property<DateTime>("Fecha")
-                        .HasColumnType("datetime(6)");
+                    b.Property<int>("Estado")
+                        .HasColumnType("int");
 
                     b.Property<string>("OrgId")
                         .IsRequired()
                         .HasMaxLength(65)
                         .HasColumnType("varchar(65)");
 
-                    b.Property<string>("UserId")
+                    b.Property<bool>("Status")
+                        .HasColumnType("tinyint(1)");
+
+                    b.HasKey("ClienteId");
+
+                    b.ToTable("Clientes");
+                });
+
+            modelBuilder.Entity("Ali25_V10.Data.Modelos.W220_Folios", b =>
+                {
+                    b.Property<string>("FolioId")
+                        .HasMaxLength(65)
+                        .HasColumnType("varchar(65)");
+
+                    b.Property<string>("ClienteId")
                         .IsRequired()
                         .HasMaxLength(65)
                         .HasColumnType("varchar(65)");
 
-                    b.HasKey("BitacoraId");
+                    b.Property<int>("Estado")
+                        .HasColumnType("int");
 
-                    b.HasIndex("OrgId");
+                    b.Property<DateTime>("FechaCaptura")
+                        .HasColumnType("datetime(6)");
 
-                    b.HasIndex("UserId");
+                    b.Property<DateTime>("FechaFolio")
+                        .HasColumnType("datetime(6)");
 
-                    b.ToTable("Z900_Bitacora");
+                    b.Property<string>("Folio")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
+
+                    b.Property<string>("FormatoId")
+                        .IsRequired()
+                        .HasMaxLength(65)
+                        .HasColumnType("varchar(65)");
+
+                    b.Property<string>("OrgId")
+                        .IsRequired()
+                        .HasMaxLength(65)
+                        .HasColumnType("varchar(65)");
+
+                    b.Property<bool>("Status")
+                        .HasColumnType("tinyint(1)");
+
+                    b.HasKey("FolioId");
+
+                    b.ToTable("Folios");
+                });
+
+            modelBuilder.Entity("Ali25_V10.Data.Modelos.W222_FolioDet", b =>
+                {
+                    b.Property<string>("FolioId")
+                        .HasMaxLength(65)
+                        .HasColumnType("varchar(65)");
+
+                    b.Property<string>("Campo")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<int>("Estado")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("Status")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Valor")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.HasKey("FolioId");
+
+                    b.ToTable("FoliosDet");
+                });
+
+            modelBuilder.Entity("Ali25_V10.Data.Modelos.W290_Formatos", b =>
+                {
+                    b.Property<string>("FormatoId")
+                        .HasMaxLength(65)
+                        .HasColumnType("varchar(65)");
+
+                    b.Property<string>("Descripcion")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<int>("Estado")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FormatoNombre")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<bool>("Global")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("OrgId")
+                        .IsRequired()
+                        .HasMaxLength(65)
+                        .HasColumnType("varchar(65)");
+
+                    b.Property<bool>("Status")
+                        .HasColumnType("tinyint(1)");
+
+                    b.HasKey("FormatoId");
+
+                    b.ToTable("Formatos");
+                });
+
+            modelBuilder.Entity("Ali25_V10.Data.Modelos.W291_FormatoGpo", b =>
+                {
+                    b.Property<string>("FormatoGpoId")
+                        .HasMaxLength(65)
+                        .HasColumnType("varchar(65)");
+
+                    b.Property<int>("Estado")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FormatoId")
+                        .IsRequired()
+                        .HasMaxLength(65)
+                        .HasColumnType("varchar(65)");
+
+                    b.Property<string>("OrgId")
+                        .IsRequired()
+                        .HasMaxLength(65)
+                        .HasColumnType("varchar(65)");
+
+                    b.Property<bool>("Status")
+                        .HasColumnType("tinyint(1)");
+
+                    b.HasKey("FormatoGpoId");
+
+                    b.ToTable("FormatosGrupos");
+                });
+
+            modelBuilder.Entity("Ali25_V10.Data.Modelos.WConfig", b =>
+                {
+                    b.Property<string>("ConfigId")
+                        .HasMaxLength(65)
+                        .HasColumnType("varchar(65)");
+
+                    b.Property<string>("Clave")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<string>("Descripcion")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<bool>("EsGrupo")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<int>("Estado")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("Fecha")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("Global")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Grupo")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .HasColumnType("varchar(25)");
+
+                    b.Property<int>("Numero")
+                        .HasColumnType("int");
+
+                    b.Property<string>("OrgId")
+                        .IsRequired()
+                        .HasMaxLength(65)
+                        .HasColumnType("varchar(65)");
+
+                    b.Property<bool>("Status")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Texto")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("varchar(2)");
+
+                    b.Property<string>("Titulo")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .HasColumnType("varchar(25)");
+
+                    b.HasKey("ConfigId");
+
+                    b.ToTable("Configuraciones");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -408,25 +598,6 @@ namespace Ali25_V10.Data.Migrations.Application
                     b.Navigation("Org");
                 });
 
-            modelBuilder.Entity("Ali25_V10.Data.Modelos.Z900_Bitacora", b =>
-                {
-                    b.HasOne("Ali25_V10.Data.Modelos.W100_Org", "Org")
-                        .WithMany("Bitacoras")
-                        .HasForeignKey("OrgId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Ali25_V10.Data.ApplicationUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Org");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
@@ -480,8 +651,6 @@ namespace Ali25_V10.Data.Migrations.Application
 
             modelBuilder.Entity("Ali25_V10.Data.Modelos.W100_Org", b =>
                 {
-                    b.Navigation("Bitacoras");
-
                     b.Navigation("Users");
                 });
 #pragma warning restore 612, 618

@@ -1,0 +1,112 @@
+@page "/Clientes/FolioDetalle/{FolioId}"
+@inherits FolioDetalleBase
+@rendermode InteractiveServer
+
+<PageTitle>Detalle del Folio</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h3>Detalle del Folio - @folio?.Folio</h3>
+                <div>
+                    <RadzenButton Click="@(() => NavigationManager.NavigateTo("/Clientes/Folios"))"
+                                Icon="arrow_back"
+                                ButtonStyle="ButtonStyle.Secondary"
+                                class="me-2">
+                        Regresar
+                    </RadzenButton>
+                    <RadzenButton Click="@(() => gridFolioDet.Reload())"
+                                Icon="refresh"
+                                ButtonStyle="ButtonStyle.Light">
+                        Refrescar
+                    </RadzenButton>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    <RadzenDataGrid @ref="gridFolioDet"
+                   Data="@folioDetalles"    
+                   Count="@count"
+                   TItem="W222_FolioDet"
+                   AllowFiltering="true"
+                   AllowColumnResize="true"
+                   AllowAlternatingRows="false"
+                   FilterMode="FilterMode.Advanced"
+                   AllowSorting="true"
+                   PageSize="10"
+                   AllowPaging="true"
+                   PagerHorizontalAlign="HorizontalAlign.Left"
+                   ShowPagingSummary="true"
+                   EditMode="DataGridEditMode.Single"
+                   RowUpdate="@OnUpdateRow"
+                   class="rz-shadow-3">
+        <Columns>
+            <RadzenDataGridColumn TItem="W222_FolioDet" Property="Campo" Title="Campo">
+                <Template Context="detalle">
+                    @detalle.Campo
+                </Template>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="W222_FolioDet" Property="Valor" Title="Valor">
+                <Template Context="detalle">
+                    @detalle.Valor
+                </Template>
+                <EditTemplate Context="detalle">
+                    @switch (GetTipoCampo(detalle.Campo).ToLower())
+                    {
+                        case "decimal":
+                            <RadzenNumeric @bind-Value="detalle.Valor" Style="width:100%" />
+                            break;
+                        case "lista":
+                            <RadzenDropDown @bind-Value="detalle.Valor"
+                                          Data="@(new[] { "Opción 1", "Opción 2", "Opción 3" })"
+                                          Style="width:100%" />
+                            break;
+                        default:
+                            <RadzenTextBox @bind-Value="detalle.Valor" Style="width:100%" />
+                            break;
+                    }
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="W222_FolioDet" Property="Estado" Title="Estado" Width="100px">
+                <Template Context="detalle">
+                    <RadzenLabel Text="Pendiente" />
+                </Template>
+                <EditTemplate Context="detalle">
+                    
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="W222_FolioDet" Width="70px" Sortable="false" Filterable="false">
+                <Template Context="detalle">
+                    <RadzenButton Icon="edit"
+                                ButtonStyle="ButtonStyle.Light"
+                                Variant="Variant.Flat"
+                                Size="ButtonSize.Medium"
+                                Click="@(() => EditRow(detalle))" />
+                </Template>
+                <EditTemplate Context="detalle">
+                    <RadzenButton Icon="check"
+                                ButtonStyle="ButtonStyle.Success"
+                                Variant="Variant.Flat"
+                                Size="ButtonSize.Small"
+                                Click="@(() => SaveRow(detalle))"
+                                class="me-1" />
+                    <RadzenButton Icon="close"
+                                ButtonStyle="ButtonStyle.Light"
+                                Variant="Variant.Flat"
+                                Size="ButtonSize.Small"
+                                Click="@(() => CancelEdit(detalle))" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+</div> 

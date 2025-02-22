@@ -12,7 +12,6 @@ public class BitacoraDbContext : DbContext
     {
     }
 
-    public DbSet<ZConfig> Configuraciones { get; set; }
     public DbSet<Z900_Bitacora> Bitacoras { get; set; }
     public DbSet<Z910_Log> Log { get; set; }
 

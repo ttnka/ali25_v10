@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Ali25_V10.Data.Migrations.Application
 {
     /// <inheritdoc />
-    public partial class Initial : Migration
+    public partial class Inicial : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -65,6 +65,144 @@ namespace Ali25_V10.Data.Migrations.Application
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateTable(
+                name: "Clientes",
+                columns: table => new
+                {
+                    ClienteId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    OrgId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    ClienteOrgId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Estado = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<bool>(type: "tinyint(1)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Clientes", x => x.ClienteId);
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "Configuraciones",
+                columns: table => new
+                {
+                    ConfigId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Grupo = table.Column<string>(type: "varchar(25)", maxLength: 25, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Clave = table.Column<string>(type: "varchar(50)", maxLength: 50, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Titulo = table.Column<string>(type: "varchar(25)", maxLength: 25, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Descripcion = table.Column<string>(type: "varchar(1000)", maxLength: 1000, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Tipo = table.Column<string>(type: "varchar(2)", maxLength: 2, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Numero = table.Column<int>(type: "int", nullable: false),
+                    Texto = table.Column<string>(type: "longtext", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Fecha = table.Column<DateTime>(type: "datetime(6)", nullable: false),
+                    EsGrupo = table.Column<bool>(type: "tinyint(1)", nullable: false),
+                    Global = table.Column<bool>(type: "tinyint(1)", nullable: false),
+                    OrgId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Estado = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<bool>(type: "tinyint(1)", nullable: false),
+                    FechaCreacion = table.Column<DateTime>(type: "datetime(6)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Configuraciones", x => x.ConfigId);
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "Folios",
+                columns: table => new
+                {
+                    FolioId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Folio = table.Column<string>(type: "varchar(10)", maxLength: 10, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    FechaFolio = table.Column<DateTime>(type: "datetime(6)", nullable: false),
+                    FechaCaptura = table.Column<DateTime>(type: "datetime(6)", nullable: false),
+                    ClienteId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    FormatoId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    OrgId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Estado = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<bool>(type: "tinyint(1)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Folios", x => x.FolioId);
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "FoliosDet",
+                columns: table => new
+                {
+                    FolioId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Campo = table.Column<string>(type: "longtext", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Valor = table.Column<string>(type: "longtext", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Estado = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<bool>(type: "tinyint(1)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_FoliosDet", x => x.FolioId);
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "Formatos",
+                columns: table => new
+                {
+                    FormatoId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    FormatoNombre = table.Column<string>(type: "varchar(50)", maxLength: 50, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Descripcion = table.Column<string>(type: "longtext", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    OrgId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Global = table.Column<bool>(type: "tinyint(1)", nullable: false),
+                    Estado = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<bool>(type: "tinyint(1)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Formatos", x => x.FormatoId);
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "FormatosGrupos",
+                columns: table => new
+                {
+                    FormatoGpoId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    FormatoId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    OrgId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Estado = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<bool>(type: "tinyint(1)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_FormatosGrupos", x => x.FormatoGpoId);
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
                 name: "Organizaciones",
                 columns: table => new
                 {
@@ -74,7 +212,7 @@ namespace Ali25_V10.Data.Migrations.Application
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     Comercial = table.Column<string>(type: "varchar(25)", maxLength: 25, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    RazonSocial = table.Column<string>(type: "varchar(75)", maxLength: 75, nullable: true)
+                    RazonSocial = table.Column<string>(type: "varchar(75)", maxLength: 75, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     Moral = table.Column<bool>(type: "tinyint(1)", nullable: false),
                     NumCliente = table.Column<string>(type: "varchar(10)", maxLength: 10, nullable: true)
@@ -121,16 +259,18 @@ namespace Ali25_V10.Data.Migrations.Application
                 {
                     Id = table.Column<string>(type: "varchar(255)", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    Nombre = table.Column<string>(type: "longtext", nullable: false)
+                    Nombre = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    Paterno = table.Column<string>(type: "longtext", nullable: false)
+                    Paterno = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    Materno = table.Column<string>(type: "longtext", nullable: false)
+                    Materno = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     FechaRegistro = table.Column<DateTime>(type: "datetime(6)", nullable: false),
                     FechaNacimiento = table.Column<DateTime>(type: "datetime(6)", nullable: false),
+                    Nivel = table.Column<int>(type: "int", nullable: false),
                     EsActivo = table.Column<bool>(type: "tinyint(1)", nullable: false),
                     Estado = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<bool>(type: "tinyint(1)", nullable: false),
                     OrgId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     W100_OrgOrgId = table.Column<string>(type: "varchar(65)", nullable: true)
@@ -345,6 +485,24 @@ namespace Ali25_V10.Data.Migrations.Application
 
             migrationBuilder.DropTable(
                 name: "AspNetUserTokens");
+
+            migrationBuilder.DropTable(
+                name: "Clientes");
+
+            migrationBuilder.DropTable(
+                name: "Configuraciones");
+
+            migrationBuilder.DropTable(
+                name: "Folios");
+
+            migrationBuilder.DropTable(
+                name: "FoliosDet");
+
+            migrationBuilder.DropTable(
+                name: "Formatos");
+
+            migrationBuilder.DropTable(
+                name: "FormatosGrupos");
 
             migrationBuilder.DropTable(
                 name: "AspNetRoles");
