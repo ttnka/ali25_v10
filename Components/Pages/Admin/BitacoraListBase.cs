@@ -4,28 +4,42 @@ using Ali25_V10.Data.Sistema;
 using Microsoft.AspNetCore.Components;
 using Radzen;
 using Radzen.Blazor;
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Ali25_V10.Components.Pages.Admin;
 
-public class BitacoraListBase : ComponentBase
+public class BitacoraListBase : ComponentBase, IDisposable
 {
+    // Standard properties
     [CascadingParameter] protected ApplicationUser CurrentUser { get; set; } = default!;
+    protected bool isLoading;
+    protected bool isRefreshing;
+    protected bool bypassCache;
+    protected string? errorMessage;
+    protected CancellationTokenSource cts = new(TimeSpan.FromSeconds(30));
+    protected CancellationTokenSource quickCts = new(TimeSpan.FromSeconds(5));
+
+    // Injected services
     [Inject] protected IRepoBitacora RepoBitacora { get; set; } = default!;
     [Inject] protected IRepo<W100_Org> RepoOrg { get; set; } = default!;
     [Inject] protected IRepo<ApplicationUser> RepoUser { get; set; } = default!;
     [Inject] protected IRepo<W210_Clientes> RepoClientes { get; set; } = default!;
 
+    // Grid properties
     protected RadzenDataGrid<Z900_Bitacora> gridBitacora = default!;
     protected IEnumerable<Z900_Bitacora>? bitacoras;
-    protected List<W100_Org> orgsDisponibles = new();
-    protected List<ApplicationUser> usuariosDisponibles = new();
-    protected bool isLoading;
-    protected string? errorMessage;
     protected int count;
     protected int pageSize = 10;
     protected int pageNumber = 0;
 
-    // Filtros
+    // Component specific properties
+    protected List<W100_Org> orgsDisponibles = new();
+    protected List<ApplicationUser> usuariosDisponibles = new();
+    protected List<Z900_Bitacora> bitacorasToInsert = new();
+    
     protected bool showFilters = true;
     protected string? selectedOrgId;
     protected string? selectedUserId;
@@ -34,14 +48,33 @@ public class BitacoraListBase : ComponentBase
     protected DateTime? fechaInicio;
     protected DateTime? fechaFin;
 
+    public void Dispose()
+    {
+        try { cts?.Cancel(); } catch { }
+        try { cts?.Dispose(); } catch { }
+        try { quickCts?.Cancel(); } catch { }
+        try { quickCts?.Dispose(); } catch { }
+        GC.SuppressFinalize(this);
+    }
+
     protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        await base.OnInitializedAsync();
+    }
+
+    protected async Task LoadData()
     {
         try
         {
+            isLoading = true;
+            errorMessage = null;
+
             // Cargar organizaciones según nivel
             var orgsResult = await RepoOrg.Get(
                 orgId: CurrentUser.OrgId,
-                elUser: CurrentUser
+                elUser: CurrentUser,
+                cancellationToken: cts.Token
             );
 
             if (orgsResult.Exito)
@@ -51,7 +84,8 @@ public class BitacoraListBase : ComponentBase
                 {
                     var clientes = await RepoClientes.Get(
                         orgId: CurrentUser.OrgId,
-                        elUser: CurrentUser
+                        elUser: CurrentUser,
+                        cancellationToken: quickCts.Token
                     );
 
                     if (clientes.Exito && clientes.DataVarios != null)
@@ -73,7 +107,8 @@ public class BitacoraListBase : ComponentBase
             // Cargar usuarios
             var usersResult = await RepoUser.Get(
                 orgId: CurrentUser.OrgId,
-                elUser: CurrentUser
+                elUser: CurrentUser,
+                cancellationToken: quickCts.Token
             );
 
             if (usersResult.Exito)
@@ -82,26 +117,25 @@ public class BitacoraListBase : ComponentBase
             }
 
             selectedOrgId = CurrentUser.OrgId;
-            await LoadData();
+            await RefreshData();
         }
         catch (Exception ex)
         {
-            errorMessage = ex.Message;
-            await RepoBitacora.AddLog(
-                userId: CurrentUser.Id,
-                orgId: CurrentUser.OrgId,
-                desc: $"Error al inicializar bitácora: {ex.Message}",
-                tipoLog: "Error",
-                origen: "BitacoraListBase.OnInitializedAsync"
-            );
+            await LogError(ex, "Error al cargar datos iniciales");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
         }
     }
 
-    protected async Task LoadData()
+    protected async Task RefreshData()
     {
         try
         {
-            isLoading = true;
+            isRefreshing = true;
+            errorMessage = null;
             
             var result = await RepoBitacora.GetBitacoraFiltrada(
                 orgId: selectedOrgId ?? CurrentUser.OrgId,
@@ -113,8 +147,10 @@ public class BitacoraListBase : ComponentBase
                     FechaInicio = fechaInicio ?? fechaFilter,
                     FechaFin = fechaFin,
                     Rango = fechaInicio.HasValue && fechaFin.HasValue,
-                    Ascen = false // Para ordenar descendente por fecha
-                }
+                    Ascen = false
+                },
+                byPassCache: bypassCache,
+                cancellationToken: cts.Token
             );
 
             if (result.Exito && result.DataVarios != null)
@@ -127,20 +163,70 @@ public class BitacoraListBase : ComponentBase
         }
         catch (Exception ex)
         {
-            errorMessage = ex.Message;
-            await RepoBitacora.AddLog(
-                userId: CurrentUser.Id,
-                orgId: CurrentUser.OrgId,
-                desc: $"Error al cargar bitácora: {ex.Message}",
-                tipoLog: "Error",
-                origen: "BitacoraListBase.LoadData"
-            );
+            await LogError(ex, "Error al refrescar datos");
         }
         finally
         {
-            isLoading = false;
+            isRefreshing = false;
             StateHasChanged();
         }
+    }
+
+    protected async Task LoadPage(LoadDataArgs args)
+    {
+        try
+        {
+            pageSize = args.Top ?? 10;
+            pageNumber = args.Skip ?? 0;
+            await RefreshData();
+        }
+        catch (Exception ex)
+        {
+            await LogError(ex, "Error al cargar página");
+        }
+    }
+
+    protected async Task OnOrgSelected(string? orgId)
+    {
+        selectedOrgId = orgId;
+        await RefreshData();
+    }
+
+    protected async Task OnUserSelected(string? userId)
+    {
+        selectedUserId = userId;
+        await RefreshData();
+    }
+
+    protected async Task OnDescripcionChanged(string? desc)
+    {
+        descripcionFilter = desc;
+        await RefreshData();
+    }
+
+    protected async Task OnFechaChanged(DateTime? fecha)
+    {
+        fechaFilter = fecha;
+        await RefreshData();
+    }
+    
+
+    protected void Reset(Z900_Bitacora bitacora)
+    {
+        bitacorasToInsert.Remove(bitacora);
+        
+    }
+
+    protected void Reset()
+    {
+        bitacorasToInsert.Clear();
+        
+    }
+
+
+    protected async Task ToggleBypassCache()
+    {
+        bypassCache = !bypassCache;
     }
 
     protected string GetUserDisplay(string userId)
@@ -161,50 +247,16 @@ public class BitacoraListBase : ComponentBase
         return orgsDisponibles.FirstOrDefault(o => o.OrgId == orgId)?.Comercial ?? orgId;
     }
 
-    protected async Task LoadPage(LoadDataArgs args)
+    protected async Task LogError(Exception ex, string message)
     {
-        pageNumber = args.Skip ?? 0;
-        pageSize = args.Top ?? 10;
-        await LoadData();
-    }
-
-    protected async Task OnOrgSelected(string? value)
-    {
-        selectedOrgId = value;
-        await LoadData();
-    }
-
-    protected async Task OnUserSelected(string? value)
-    {
-        selectedUserId = value;
-        await LoadData();
-    }
-
-    protected async Task OnDescripcionChanged(string? value)
-    {
-        descripcionFilter = value;
-        await LoadData();
-    }
-
-    protected async Task OnFechaChanged(DateTime? value)
-    {
-        fechaFilter = value;
-        fechaInicio = null;
-        fechaFin = null;
-        await LoadData();
-    }
-
-    protected async Task OnRangoFechasChanged(DateRange range)
-    {
-        fechaInicio = range.Start;
-        fechaFin = range.End;
-        fechaFilter = null;
-        await LoadData();
-    }
-
-    protected class DateRange
-    {
-        public DateTime Start { get; set; }
-        public DateTime End { get; set; }
+        errorMessage = $"{message}: {ex.Message}";
+        await RepoBitacora.AddLog(
+            userId: CurrentUser?.Id ?? "Sistema",
+            orgId: CurrentUser?.OrgId ?? "Sistema",
+            desc: $"{message}: {ex.Message}\nStackTrace: {ex.StackTrace}",
+            tipoLog: "Error",
+            origen: "BitacoraListBase",
+            cancellationToken: quickCts.Token
+        );
     }
 } 

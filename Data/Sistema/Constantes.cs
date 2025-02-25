@@ -10,7 +10,7 @@ public class Constantes
         public const string ServerMail01 = "mail.omnis.com";
         public const int PortMail01 = 587;
         public const string UserNameMail01 = "soporte@zuverworks.com";
-        public const string PasswordMail01 = "wB.2468022";
+        public const string PasswordMail01 = "wB.2468022"; 
         
 
         // Mail 02
@@ -32,7 +32,7 @@ public class Constantes
 
         // Registro Usuario Publico en GENERAL
 
-        public const string DeNombreMailPublico = "Publico";
+        public const string DeNombreMailPublico = "Publico"; 
         public const string DeMailPublico = "publico@pegia.mx";
         public const int EstadoPublico = 3;
         public const int NivelPublico = 1;
@@ -45,6 +45,7 @@ public class Constantes
         public const int EstadoAdmin = 3;
         public const bool StatusAdmin = true;
         public const int NivelAdmin = 7;
+        
         public const string AdminMail = "webmaster@zuverworks.com";
         public const string AdminPassword = "24680212Ih.";
 

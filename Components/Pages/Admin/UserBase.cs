@@ -10,6 +10,7 @@ using Ali25_V10.Data;
 using Ali25_V10.Data.Modelos;
 using Ali25_V10.Data.Sistema;
 using System.Threading;
+using Microsoft.AspNetCore.Identity;
 
 namespace Ali25_V10.Components.Pages.Admin
 {
@@ -22,7 +23,7 @@ namespace Ali25_V10.Components.Pages.Admin
         [Inject] protected IRepo<ApplicationUser> RepoUser { get; set; } = default!;
         [Inject] protected IRepoBitacora RepoBitacora { get; set; } = default!;
         [Inject] protected IRepo<W100_Org> RepoOrg { get; set; } = default!;
-
+        [Inject] protected UserManager<ApplicationUser> UserManager { get; set; } = default!;
 
         protected RadzenDataGrid<ApplicationUser> gridUser = default!;
         
@@ -54,18 +55,25 @@ namespace Ali25_V10.Components.Pages.Admin
         
         protected string selectedTipo { get; set; } = "Todas";
 
-        private readonly CancellationTokenSource _ctsOperations = new(TimeSpan.FromSeconds(30));
-        private readonly CancellationTokenSource _ctsBitacora = new(TimeSpan.FromSeconds(5));
+        protected readonly CancellationTokenSource _ctsOperations = new(TimeSpan.FromSeconds(30));
+        protected readonly CancellationTokenSource _ctsBitacora = new(TimeSpan.FromSeconds(5));
+        protected readonly CancellationTokenSource _ctsLogs = new(TimeSpan.FromSeconds(5));
+
+        protected string? errorMessage;
+        protected List<string> MsnError { get; set; } = new List<string>();
+
+        protected string ErroresCompleto => string.Join(" | ", MsnError);
 
         public void Dispose()
         {
             _ctsOperations.Dispose();
             _ctsBitacora.Dispose();
+            _ctsLogs.Dispose();
         }
 
         protected override async Task OnInitializedAsync()
         {
-            try 
+            try
             {
                 LaOrgId = CurrentUser.OrgId;
                 
@@ -107,14 +115,7 @@ namespace Ali25_V10.Components.Pages.Admin
             }
             catch (Exception ex)
             {
-                await RepoBitacora.AddLog(
-                    userId: CurrentUser?.Id ?? "Sistema",
-                    orgId: CurrentUser?.OrgId ?? "Sistema",
-                    desc: $"Error en UserBase: {ex.Message}\nStack: {ex.StackTrace}",
-                    tipoLog: "Error",
-                    origen: "UserBase.OnInitializedAsync",
-                    cancellationToken: _ctsBitacora.Token
-                );
+                await LogError(ex, "OnInitializedAsync");
             }
         }
 
@@ -136,7 +137,8 @@ namespace Ali25_V10.Components.Pages.Admin
                 {
                     var result = await RepoUser.Get(
                         orgId: LaOrgId,
-                        elUser: CurrentUser
+                        elUser: CurrentUser,
+                        cancellationToken: _ctsOperations.Token
                     );
 
                     if (result.Exito)
@@ -159,14 +161,7 @@ namespace Ali25_V10.Components.Pages.Admin
             }
             catch (Exception ex)
             {
-                await RepoBitacora.AddLog(
-                    userId: CurrentUser?.Id ?? "Sistema",
-                    orgId: CurrentUser?.OrgId ?? "Sistema",
-                    desc: $"Error al cargar usuarios: {ex.Message}",
-                    tipoLog: "Error",
-                    origen: "UserBase.LoadData",
-                    cancellationToken: _ctsBitacora.Token
-                );
+                await LogError(ex, "LoadData");
             }
             finally
             {
@@ -174,6 +169,7 @@ namespace Ali25_V10.Components.Pages.Admin
                 StateHasChanged();
             }
         }
+
         protected async Task FiltroOrgByTipo()
         {
             try
@@ -189,14 +185,7 @@ namespace Ali25_V10.Components.Pages.Admin
             }
             catch (Exception ex)
             {
-                await RepoBitacora.AddLog(
-                    userId: CurrentUser?.Id ?? "Sistema",
-                    orgId: CurrentUser?.OrgId ?? "Sistema",
-                    desc: $"Error al cargar usuarios: {ex.Message}",
-                    tipoLog: "Error",
-                    origen: "UserBase.LoadData",
-                    cancellationToken: _ctsBitacora.Token
-                );
+                await LogError(ex, "FiltroOrgByTipo");
             }
             finally
             {
@@ -216,13 +205,7 @@ namespace Ali25_V10.Components.Pages.Admin
             }
             catch (Exception ex)
             {
-                await RepoBitacora.AddLog(
-                    userId: CurrentUser?.Id ?? "Sistema",
-                    orgId: CurrentUser?.OrgId ?? "Sistema",
-                    desc: $"Error al refrescar usuarios: {ex.Message}",
-                    tipoLog: "Error",
-                    origen: $"UserBase.RefreshData"
-                );
+                await LogError(ex, "RefreshData");
             }
             finally
             {
@@ -236,18 +219,57 @@ namespace Ali25_V10.Components.Pages.Admin
             bypassCache = !bypassCache;
         }
 
-        protected async Task OnOrgSelected(object value)
+        protected async Task OnOrgSelected(object? value)
         {
             if (value != null)
             {
-                LaOrgId = value.ToString();
+                LaOrgId = value.ToString() ?? CurrentUser.OrgId;
                 await LoadData();
             }
         }
+
         protected async Task OnFiltroSelected(object? value)
         {
             selectedTipo = value?.ToString() ?? "Todas";
             await FiltroOrgByTipo();
+        }
+
+        protected async Task SaveRow(ApplicationUser user)
+        {
+            try
+            {
+                if (gridUser != null)
+                {
+                    await gridUser.UpdateRow(user);
+                    usersToUpdate.Add(user);
+                    var result = await RepoUser.Update(user, CurrentUser.OrgId, elUser: CurrentUser, cancellationToken: _ctsOperations.Token);
+                    if (!result.Exito)
+                    {
+                        MsnError.Add(result.Texto);
+                        errorMessage = ErroresCompleto;
+                        await LogError(new Exception(errorMessage), "SaveRow");
+                    }
+                    await LoadData();
+                }
+            }
+            catch (Exception ex)
+            {
+                MsnError.Add(ex.Message);
+                errorMessage = ErroresCompleto;
+                await LogError(ex, "SaveRow");
+            }
+        }
+
+        protected async Task LogError(Exception ex, string origen)
+        {
+            await RepoBitacora.AddLog(
+                userId: CurrentUser.Id,
+                desc: $"Error en {origen}: {ex.Message}",
+                tipoLog: "Error",
+                origen: $"UserBase.{origen}",
+                orgId: CurrentUser.OrgId,
+                cancellationToken: _ctsLogs.Token
+            );
         }
     }
 } 

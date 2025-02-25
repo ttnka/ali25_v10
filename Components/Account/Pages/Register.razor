@@ -1,4 +1,4 @@
-@page "/Account/Register"
+﻿@page "/Account/Register"
 
 @using System.ComponentModel.DataAnnotations
 @using System.Text
@@ -6,8 +6,6 @@
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.WebUtilities
 @using Ali25_V10.Data
-@using Ali25_V10.Data.Sistema
-@using Ali25_V10.Data.Modelos
 
 @inject UserManager<ApplicationUser> UserManager
 @inject IUserStore<ApplicationUser> UserStore
@@ -16,8 +14,6 @@
 @inject ILogger<Register> Logger
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
-@inject IRepo<W100_Org> OrgsRepo
-@inject IHttpContextAccessor HttpContextAccessor
 
 <PageTitle>Register</PageTitle>
 
@@ -46,20 +42,6 @@
                 <label for="confirm-password">Confirm Password</label>
                 <ValidationMessage For="() => Input.ConfirmPassword" class="text-danger" />
             </div>
-            <div class="form-group">
-                <label>Organización</label>
-                <InputSelect @bind-Value="Input.OrgId" class="form-control">
-                    <option value="">Seleccione una organización</option>
-                    @if (Organizaciones != null)
-                    {
-                        @foreach (var org in Organizaciones)
-                        {
-                            <option value="@org.OrgId">@org.RazonSocial</option>
-                        }
-                    }
-                </InputSelect>
-                <ValidationMessage For="() => Input.OrgId" class="text-danger" />
-            </div>
             <button type="submit" class="w-100 btn btn-lg btn-primary">Register</button>
         </EditForm>
     </div>
@@ -73,16 +55,7 @@
 </div>
 
 @code {
-    // Agregar SystemUser para la consulta inicial de organizaciones
-    private ApplicationUser SystemUser => new()
-    { 
-        Id = Constantes.Sistema_Usuario,
-        UserName = Constantes.Sistema_Usuario,
-        OrgId = Constantes.Sistema_Org
-    };
-
     private IEnumerable<IdentityError>? identityErrors;
-    private List<W100_Org> Organizaciones = new();
 
     [SupplyParameterFromForm]
     private InputModel Input { get; set; } = new();
@@ -92,102 +65,41 @@
 
     private string? Message => identityErrors is null ? null : $"Error: {string.Join(", ", identityErrors.Select(error => error.Description))}";
 
-    protected override async Task OnInitializedAsync()
-    {
-        try
-        {
-            Logger.LogInformation("Iniciando carga de organizaciones");
-            
-            // Obtener todas las organizaciones usando SystemUser
-            var orgsResult = await OrgsRepo.GetAll(SystemUser, true);
-            if (orgsResult.Exito && orgsResult.DataVarios != null)
-            {
-                Organizaciones = orgsResult.DataVarios;
-                Logger.LogInformation("Organizaciones cargadas exitosamente: {Count}", 
-                    Organizaciones.Count);
-            }
-            else
-            {
-                Logger.LogError("Error al obtener organizaciones: {Error}", 
-                    string.Join(", ", orgsResult.MsnError));
-                identityErrors = new List<IdentityError> 
-                { 
-                    new IdentityError 
-                    { 
-                        Description = "Error al cargar las organizaciones" 
-                    } 
-                };
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error inesperado al cargar organizaciones");
-            identityErrors = new List<IdentityError> 
-            { 
-                new IdentityError 
-                { 
-                    Description = $"Error al inicializar: {ex.Message}" 
-                } 
-            };
-        }
-    }
-
     public async Task RegisterUser(EditContext editContext)
     {
-        try
+        var user = CreateUser();
+
+        await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
+        var emailStore = GetEmailStore();
+        await emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
+        var result = await UserManager.CreateAsync(user, Input.Password);
+
+        if (!result.Succeeded)
         {
-            // 1. Validar que tengamos una organización seleccionada
-            if (string.IsNullOrEmpty(Input.OrgId))
-            {
-                Logger.LogError("Error en registro: OrgId está vacío");
-                identityErrors = new List<IdentityError> 
-                { 
-                    new IdentityError 
-                    { 
-                        Description = "Debe seleccionar una organización" 
-                    } 
-                };
-                return;
-            }
-
-            // 2. Crear el usuario con datos básicos
-            var user = CreateUser();
-            user.OrgId = Input.OrgId;
-            user.UserName = Input.Email;
-            user.Email = Input.Email;
-            user.EmailConfirmed = true;
-            user.Nombre = "Usuario";
-            user.Paterno = "Nuevo";
-            user.FechaNacimiento = DateTime.Now;
-            user.EsActivo = true;
-            user.Estado = 1;
-
-            // 3. Intentar guardar el usuario
-            var result = await UserManager.CreateAsync(user, Input.Password);
-
-            if (!result.Succeeded)
-            {
-                Logger.LogError("Error al crear usuario: {Errors}", 
-                    string.Join(", ", result.Errors.Select(e => e.Description)));
-                identityErrors = result.Errors;
-                return;
-            }
-
-            // 4. Login inmediato sin confirmación
-            await SignInManager.SignInAsync(user, isPersistent: false);
-            RedirectManager.RedirectTo(ReturnUrl);
+            identityErrors = result.Errors;
+            return;
         }
-        catch (Exception ex)
+
+        Logger.LogInformation("User created a new account with password.");
+
+        var userId = await UserManager.GetUserIdAsync(user);
+        var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
+        code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+        var callbackUrl = NavigationManager.GetUriWithQueryParameters(
+            NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
+            new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code, ["returnUrl"] = ReturnUrl });
+
+        await EmailSender.SendConfirmationLinkAsync(user, Input.Email, HtmlEncoder.Default.Encode(callbackUrl));
+
+        if (UserManager.Options.SignIn.RequireConfirmedAccount)
         {
-            Logger.LogError(ex, "Error inesperado durante el registro de usuario");
-            identityErrors = new List<IdentityError> 
-            { 
-                new IdentityError 
-                { 
-                    Description = $"Error inesperado: {ex.Message}" 
-                } 
-            };
+            RedirectManager.RedirectTo(
+                "Account/RegisterConfirmation",
+                new() { ["email"] = Input.Email, ["returnUrl"] = ReturnUrl });
         }
+
+        await SignInManager.SignInAsync(user, isPersistent: false);
+        RedirectManager.RedirectTo(ReturnUrl);
     }
 
     private ApplicationUser CreateUser()
@@ -229,8 +141,5 @@
         [Display(Name = "Confirm password")]
         [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
         public string ConfirmPassword { get; set; } = "";
-
-        [Required(ErrorMessage = "La organización es requerida")]
-        public string OrgId { get; set; } = string.Empty;
     }
 }

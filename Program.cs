@@ -56,23 +56,32 @@ builder.Services.Configure<MemoryCacheOptions>(options =>
 });
 
 // Registrar servicios de repositorio
+builder.Services.AddTransient<IRepo<ApplicationUser>, Repo<ApplicationUser, ApplicationDbContext>>();
+builder.Services.AddTransient<IRepo<WConfig>, Repo<WConfig, BitacoraDbContext>>();
+builder.Services.AddScoped<IRepoBitacora, RepoBitacora>();
+
 builder.Services.AddTransient<IRepo<W100_Org>, Repo<W100_Org, ApplicationDbContext>>();
 builder.Services.AddTransient<IRepo<W180_Files>, Repo<W180_Files, ApplicationDbContext>>();
 
-builder.Services.AddTransient<IRepo<ApplicationUser>, Repo<ApplicationUser, ApplicationDbContext>>();
-builder.Services.AddTransient<IRepo<WConfig>, Repo<WConfig, BitacoraDbContext>>();
 builder.Services.AddTransient<IRepo<W210_Clientes>, Repo<W210_Clientes, ApplicationDbContext>>();
-builder.Services.AddTransient<IRepo<W290_Formatos>, Repo<W290_Formatos, ApplicationDbContext>>();
-builder.Services.AddTransient<IRepo<W291_FormatoGpo>, Repo<W291_FormatoGpo, ApplicationDbContext>>();
 builder.Services.AddTransient<IRepo<W220_Folios>, Repo<W220_Folios, ApplicationDbContext>>();
+builder.Services.AddTransient<IRepo<W221_Conceptos>, Repo<W221_Conceptos, ApplicationDbContext>>();
 builder.Services.AddTransient<IRepo<W222_FolioDet>, Repo<W222_FolioDet, ApplicationDbContext>>();
 
-// TEMPORAL_TEST_INICIO - Cambio de Transient a Scoped para diagnóstico
-builder.Services.AddScoped<IRepoBitacora, RepoBitacora>();
-// TEMPORAL_TEST_FIN
+builder.Services.AddTransient<IRepo<W280_ListaPrecios>, Repo<W280_ListaPrecios, ApplicationDbContext>>();
+builder.Services.AddTransient<IRepo<W281_Productos>, Repo<W281_Productos, ApplicationDbContext>>();
+builder.Services.AddTransient<IRepo<W282_Precios>, Repo<W282_Precios, ApplicationDbContext>>();
 
+builder.Services.AddTransient<IRepo<W290_Formatos>, Repo<W290_Formatos, ApplicationDbContext>>();
+builder.Services.AddTransient<IRepo<W291_FormatoGpo>, Repo<W291_FormatoGpo, ApplicationDbContext>>();
+builder.Services.AddTransient<IRepo<W292_FormatoDet>, Repo<W292_FormatoDet, ApplicationDbContext>>();
+
+
+// Radzen Services
 builder.Services.AddRadzenComponents();
-
+builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<TooltipService>();
+builder.Services.AddScoped<ContextMenuService>();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

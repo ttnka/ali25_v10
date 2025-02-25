@@ -113,3 +113,112 @@
         </Columns>
     </RadzenDataGrid>
 </div> 
+
+@code {
+
+    protected void Reset(W292_FormatoDet detalle)
+    {
+        formatoDetallesToInsert.Remove(detalle);
+        formatoDetallesToUpdate.Remove(detalle);
+    }
+
+    protected void Reset()
+    {
+        formatoDetallesToInsert.Clear();
+        formatoDetallesToUpdate.Clear();
+    }
+    protected async Task OnCreateRow(W292_FormatoDet detalle)
+    {
+        try
+        {
+            var result = await RepoFormatoDet.Insert(
+                detalle,
+                CurrentUser.OrgId,
+                CurrentUser,
+                _ctsOperations.Token
+            );
+
+            if (!result.Exito)
+            {
+                throw new Exception(result.Texto);
+            }
+
+            await RepoBitacora.AddBitacora(
+                userId: CurrentUser.Id,
+                desc: $"Campo agregado al formato: {detalle.Campo}",
+                orgId: CurrentUser.OrgId,
+                cancellationToken: _ctsOperations.Token
+            );
+
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            await LogError(ex, "OnCreateRow");
+            throw;
+        }
+    }
+
+    protected async Task OnUpdateRow(W292_FormatoDet detalle)
+    {
+        try
+        {
+            var result = await RepoFormatoDet.Update(
+                detalle,
+                CurrentUser.OrgId,
+                CurrentUser,
+                _ctsOperations.Token
+            );
+
+            if (!result.Exito)
+            {
+                throw new Exception(result.Texto);
+            }
+
+            await RepoBitacora.AddBitacora(
+                userId: CurrentUser.Id,
+                desc: $"Campo actualizado: {detalle.Campo}",
+                orgId: CurrentUser.OrgId,
+                cancellationToken: _ctsOperations.Token
+            );
+        }
+        catch (Exception ex)
+        {
+            await LogError(ex, "OnUpdateRow");
+            throw;
+        }
+    }
+
+    protected async Task InsertRow()
+    {
+        try
+        {
+            var maxOrden = formatoDetalles?.Max(d => d.Orden) ?? 0;
+            var detalle = new W292_FormatoDet(
+                formatoId: FormatoId,
+                orden: maxOrden + 1,
+                tipo: "texto",
+                campo: "",
+                descripcion: "",
+                estado: 5,
+                status: true
+            );
+
+            await gridFormatoDet.InsertRow(detalle);
+        }
+        catch (Exception ex)
+        {
+            await LogError(ex, "InsertRow");
+        }
+    }
+
+    protected void SaveRow(W292_FormatoDet detalle)
+    {
+        gridFormatoDet.UpdateRow(detalle);
+    }
+
+    protected void CancelEdit(W292_FormatoDet detalle)
+    {
+        gridFormatoDet.CancelEditRow(detalle);
+    }
+    }

@@ -59,16 +59,11 @@ namespace Ali25_V10.Data.Migrations.Bitacora
 
                     b.Property<string>("Materno")
                         .IsRequired()
-                        .HasMaxLength(65)
-                        .HasColumnType("varchar(65)");
-
-                    b.Property<int>("Nivel")
-                        .HasColumnType("int");
+                        .HasColumnType("longtext");
 
                     b.Property<string>("Nombre")
                         .IsRequired()
-                        .HasMaxLength(65)
-                        .HasColumnType("varchar(65)");
+                        .HasColumnType("longtext");
 
                     b.Property<string>("NormalizedEmail")
                         .HasColumnType("longtext");
@@ -86,8 +81,7 @@ namespace Ali25_V10.Data.Migrations.Bitacora
 
                     b.Property<string>("Paterno")
                         .IsRequired()
-                        .HasMaxLength(65)
-                        .HasColumnType("varchar(65)");
+                        .HasColumnType("longtext");
 
                     b.Property<string>("PhoneNumber")
                         .HasColumnType("longtext");
@@ -97,9 +91,6 @@ namespace Ali25_V10.Data.Migrations.Bitacora
 
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("longtext");
-
-                    b.Property<bool>("Status")
-                        .HasColumnType("tinyint(1)");
 
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("tinyint(1)");
@@ -136,7 +127,6 @@ namespace Ali25_V10.Data.Migrations.Bitacora
                         .HasColumnType("varchar(10)");
 
                     b.Property<string>("RazonSocial")
-                        .IsRequired()
                         .HasMaxLength(75)
                         .HasColumnType("varchar(75)");
 
@@ -181,11 +171,16 @@ namespace Ali25_V10.Data.Migrations.Bitacora
                         .HasMaxLength(65)
                         .HasColumnType("varchar(65)");
 
+                    b.Property<string>("W100_OrgOrgId")
+                        .HasColumnType("varchar(65)");
+
                     b.HasKey("BitacoraId");
 
                     b.HasIndex("OrgId");
 
                     b.HasIndex("UserId");
+
+                    b.HasIndex("W100_OrgOrgId");
 
                     b.ToTable("Bitacoras");
                 });
@@ -228,6 +223,62 @@ namespace Ali25_V10.Data.Migrations.Bitacora
                     b.ToTable("Log");
                 });
 
+            modelBuilder.Entity("Ali25_V10.Data.Modelos.ZConfig", b =>
+                {
+                    b.Property<string>("ConfigId")
+                        .HasMaxLength(65)
+                        .HasColumnType("varchar(65)");
+
+                    b.Property<string>("Configuracion")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("varchar(2)");
+
+                    b.Property<string>("Descripcion")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<int>("Estado")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("Global")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Grupo")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .HasColumnType("varchar(25)");
+
+                    b.Property<int>("NumeroId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("OrgId")
+                        .IsRequired()
+                        .HasMaxLength(65)
+                        .HasColumnType("varchar(65)");
+
+                    b.Property<bool>("Status")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("TextoId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<bool>("TipoGrupo")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Titulo")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .HasColumnType("varchar(25)");
+
+                    b.HasKey("ConfigId");
+
+                    b.ToTable("Configuraciones");
+                });
+
             modelBuilder.Entity("Ali25_V10.Data.ApplicationUser", b =>
                 {
                     b.HasOne("Ali25_V10.Data.Modelos.W100_Org", "Org")
@@ -253,6 +304,10 @@ namespace Ali25_V10.Data.Migrations.Bitacora
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Ali25_V10.Data.Modelos.W100_Org", null)
+                        .WithMany("Bitacoras")
+                        .HasForeignKey("W100_OrgOrgId");
+
                     b.Navigation("Org");
 
                     b.Navigation("User");
@@ -260,6 +315,8 @@ namespace Ali25_V10.Data.Migrations.Bitacora
 
             modelBuilder.Entity("Ali25_V10.Data.Modelos.W100_Org", b =>
                 {
+                    b.Navigation("Bitacoras");
+
                     b.Navigation("Users");
                 });
 #pragma warning restore 612, 618

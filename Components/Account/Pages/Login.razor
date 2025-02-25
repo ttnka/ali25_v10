@@ -9,7 +9,6 @@
 @inject ILogger<Login> Logger
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
-@inject UserManager<ApplicationUser> UserManager
 
 <PageTitle>Log in</PageTitle>
 
@@ -17,11 +16,7 @@
 <div class="row">
     <div class="col-md-4">
         <section>
-            @if (!string.IsNullOrEmpty(errorMessage))
-            {
-                <div class="alert alert-danger">@errorMessage</div>
-            }
-            
+            <StatusMessage Message="@errorMessage" />
             <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login">
                 <DataAnnotationsValidator />
                 <h2>Use a local account to log in.</h2>
@@ -58,17 +53,6 @@
                     </p>
                 </div>
             </EditForm>
-
-            @* Botón de diagnóstico siempre visible *@
-            <div class="mt-3">
-                <button class="btn btn-info" @onclick="DiagnosticoUsuario">Diagnosticar Usuario</button>
-            </div>
-            @if (!string.IsNullOrEmpty(diagnosticoMessage))
-            {
-                <div class="alert alert-info mt-3">
-                    <pre>@diagnosticoMessage</pre>
-                </div>
-            }
         </section>
     </div>
     <div class="col-md-6 col-md-offset-2">
@@ -82,7 +66,6 @@
 
 @code {
     private string? errorMessage;
-    private string? diagnosticoMessage;
 
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
@@ -92,6 +75,42 @@
 
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpMethods.IsGet(HttpContext.Request.Method))
+        {
+            // Clear the existing external cookie to ensure a clean login process
+            await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+        }
+    }
+
+    public async Task LoginUser()
+    {
+        // This doesn't count login failures towards account lockout
+        // To enable password failures to trigger account lockout, set lockoutOnFailure: true
+        var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
+        if (result.Succeeded)
+        {
+            Logger.LogInformation("User logged in.");
+            RedirectManager.RedirectTo(ReturnUrl);
+        }
+        else if (result.RequiresTwoFactor)
+        {
+            RedirectManager.RedirectTo(
+                "Account/LoginWith2fa",
+                new() { ["returnUrl"] = ReturnUrl, ["rememberMe"] = Input.RememberMe });
+        }
+        else if (result.IsLockedOut)
+        {
+            Logger.LogWarning("User account locked out.");
+            RedirectManager.RedirectTo("Account/Lockout");
+        }
+        else
+        {
+            errorMessage = "Error: Invalid login attempt.";
+        }
+    }
 
     private sealed class InputModel
     {
@@ -105,132 +124,5 @@
 
         [Display(Name = "Remember me?")]
         public bool RememberMe { get; set; }
-    }
-
-    protected override async Task OnInitializedAsync()
-    {
-        if (HttpMethods.IsGet(HttpContext.Request.Method))
-        {
-            await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
-        }
-    }
-
-    private async Task DiagnosticoUsuario()
-    {
-        try
-        {
-            if (string.IsNullOrEmpty(Input.Email))
-            {
-                diagnosticoMessage = "Por favor ingrese un email para diagnosticar";
-                return;
-            }
-
-            var user = await UserManager.FindByEmailAsync(Input.Email);
-            if (user != null)
-            {
-                var roles = await UserManager.GetRolesAsync(user);
-                var lockoutEnd = user.LockoutEnd?.LocalDateTime.ToString() ?? "No bloqueado";
-                var emailConfirmed = await UserManager.IsEmailConfirmedAsync(user);
-                
-                diagnosticoMessage = 
-                    $"Diagnóstico de usuario {Input.Email}:\n" +
-                    $"ID: {user.Id}\n" +
-                    $"OrgId: {user.OrgId}\n" +
-                    $"EsActivo: {user.EsActivo}\n" +
-                    $"Estado: {user.Estado}\n" +
-                    $"Email Confirmado: {emailConfirmed}\n" +
-                    $"Bloqueo termina: {lockoutEnd}\n" +
-                    $"Roles: {string.Join(", ", roles)}\n" +
-                    $"Nombre Completo: {user.Nombre} {user.Paterno} {user.Materno}\n" +
-                    $"Fecha Registro: {user.FechaRegistro}";
-
-                Logger.LogInformation(diagnosticoMessage);
-            }
-            else
-            {
-                diagnosticoMessage = $"No se encontró usuario con email: {Input.Email}";
-                Logger.LogWarning(diagnosticoMessage);
-            }
-        }
-        catch (Exception ex)
-        {
-            diagnosticoMessage = $"Error al diagnosticar: {ex.Message}";
-            Logger.LogError(ex, "Error en diagnóstico para {Email}", Input.Email);
-        }
-    }
-
-    public async Task LoginUser(EditContext editContext)
-    {
-        errorMessage = null;
-        diagnosticoMessage = null;
-
-        try
-        {
-            Logger.LogInformation("Intento de login para usuario: {Email}", Input.Email);
-
-            var user = await UserManager.FindByEmailAsync(Input.Email);
-            if (user == null)
-            {
-                Logger.LogWarning("Usuario no encontrado: {Email}", Input.Email);
-                errorMessage = "Usuario o contraseña incorrectos";
-                return;
-            }
-
-            if (!await UserManager.IsEmailConfirmedAsync(user))
-            {
-                Logger.LogWarning("Intento de login sin email confirmado: {Email}", Input.Email);
-                errorMessage = "Necesita confirmar su email antes de iniciar sesión. " +
-                             "Por favor, revise su bandeja de entrada.";
-                return;
-            }
-
-            if (!user.EsActivo)
-            {
-                Logger.LogWarning("Intento de login de usuario inactivo: {Email}", Input.Email);
-                errorMessage = "Esta cuenta está desactivada";
-                return;
-            }
-
-            var result = await SignInManager.PasswordSignInAsync(
-                Input.Email, 
-                Input.Password, 
-                Input.RememberMe, 
-                lockoutOnFailure: true);
-
-            if (result.Succeeded)
-            {
-                Logger.LogInformation("Usuario logueado exitosamente: {Email}", Input.Email);
-                RedirectManager.RedirectTo(ReturnUrl);
-            }
-            else
-            {
-                if (result.IsNotAllowed)
-                {
-                    errorMessage = "Su cuenta requiere activación. Por favor, confirme su email o contacte al administrador.";
-                    Logger.LogWarning("Login no permitido para {Email}. Email confirmado: {EmailConfirmed}", 
-                        Input.Email, 
-                        await UserManager.IsEmailConfirmedAsync(user));
-                }
-                else if (result.IsLockedOut)
-                {
-                    errorMessage = "La cuenta está bloqueada. Intente más tarde.";
-                }
-                else if (result.RequiresTwoFactor)
-                {
-                    RedirectManager.RedirectTo(
-                        "Account/LoginWith2fa",
-                        new() { ["returnUrl"] = ReturnUrl, ["rememberMe"] = Input.RememberMe });
-                }
-                else
-                {
-                    errorMessage = "Usuario o contraseña incorrectos";
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error inesperado durante el login de {Email}", Input.Email);
-            errorMessage = $"Error inesperado: {ex.Message}";
-        }
     }
 }

@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Ali25_V10.Data.Migrations.Application
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250222032606_Inicial")]
-    partial class Inicial
+    [Migration("20250225045021_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -302,6 +302,39 @@ namespace Ali25_V10.Data.Migrations.Application
                     b.ToTable("Folios");
                 });
 
+            modelBuilder.Entity("Ali25_V10.Data.Modelos.W221_Conceptos", b =>
+                {
+                    b.Property<string>("ConceptoId")
+                        .HasMaxLength(65)
+                        .HasColumnType("varchar(65)");
+
+                    b.Property<decimal>("Cantidad")
+                        .HasColumnType("decimal(18, 2)");
+
+                    b.Property<int>("Estado")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FolioId")
+                        .IsRequired()
+                        .HasMaxLength(65)
+                        .HasColumnType("varchar(65)");
+
+                    b.Property<decimal>("Precio")
+                        .HasColumnType("decimal(18, 2)");
+
+                    b.Property<string>("ProductoId")
+                        .IsRequired()
+                        .HasMaxLength(65)
+                        .HasColumnType("varchar(65)");
+
+                    b.Property<bool>("Status")
+                        .HasColumnType("tinyint(1)");
+
+                    b.HasKey("ConceptoId");
+
+                    b.ToTable("Conceptos");
+                });
+
             modelBuilder.Entity("Ali25_V10.Data.Modelos.W222_FolioDet", b =>
                 {
                     b.Property<string>("FolioId")
@@ -325,6 +358,109 @@ namespace Ali25_V10.Data.Migrations.Application
                     b.HasKey("FolioId");
 
                     b.ToTable("FoliosDet");
+                });
+
+            modelBuilder.Entity("Ali25_V10.Data.Modelos.W280_ListaPrecios", b =>
+                {
+                    b.Property<string>("ListaPrecioId")
+                        .HasMaxLength(65)
+                        .HasColumnType("varchar(65)");
+
+                    b.Property<string>("Descripcion")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<bool>("EsGlobal")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<int>("Estado")
+                        .HasColumnType("int");
+
+                    b.Property<string>("OrgId")
+                        .IsRequired()
+                        .HasMaxLength(65)
+                        .HasColumnType("varchar(65)");
+
+                    b.Property<bool>("Status")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Titulo")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .HasColumnType("varchar(25)");
+
+                    b.HasKey("ListaPrecioId");
+
+                    b.ToTable("ListaPrecios");
+                });
+
+            modelBuilder.Entity("Ali25_V10.Data.Modelos.W281_Productos", b =>
+                {
+                    b.Property<string>("ProductoId")
+                        .HasMaxLength(65)
+                        .HasColumnType("varchar(65)");
+
+                    b.Property<string>("Clave")
+                        .IsRequired()
+                        .HasMaxLength(15)
+                        .HasColumnType("varchar(15)");
+
+                    b.Property<string>("Descripcion")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<int>("Estado")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("Grupo")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("Status")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Titulo")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<string>("UnidadMedida")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .HasColumnType("varchar(25)");
+
+                    b.HasKey("ProductoId");
+
+                    b.ToTable("Productos");
+                });
+
+            modelBuilder.Entity("Ali25_V10.Data.Modelos.W282_Precios", b =>
+                {
+                    b.Property<string>("PrecioId")
+                        .HasMaxLength(65)
+                        .HasColumnType("varchar(65)");
+
+                    b.Property<int>("Estado")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ListaPrecioId")
+                        .IsRequired()
+                        .HasMaxLength(65)
+                        .HasColumnType("varchar(65)");
+
+                    b.Property<decimal>("Precio")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<string>("ProductoId")
+                        .IsRequired()
+                        .HasMaxLength(65)
+                        .HasColumnType("varchar(65)");
+
+                    b.Property<bool>("Status")
+                        .HasColumnType("tinyint(1)");
+
+                    b.HasKey("PrecioId");
+
+                    b.ToTable("Precios");
                 });
 
             modelBuilder.Entity("Ali25_V10.Data.Modelos.W290_Formatos", b =>
@@ -386,6 +522,43 @@ namespace Ali25_V10.Data.Migrations.Application
                     b.HasKey("FormatoGpoId");
 
                     b.ToTable("FormatosGrupos");
+                });
+
+            modelBuilder.Entity("Ali25_V10.Data.Modelos.W292_FormatoDet", b =>
+                {
+                    b.Property<string>("FormatoDetId")
+                        .HasMaxLength(65)
+                        .HasColumnType("varchar(65)");
+
+                    b.Property<string>("Campo")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Descripcion")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<int>("Estado")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FormatoId")
+                        .IsRequired()
+                        .HasMaxLength(65)
+                        .HasColumnType("varchar(65)");
+
+                    b.Property<int>("Orden")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("Status")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.HasKey("FormatoDetId");
+
+                    b.ToTable("FormatosDetalles");
                 });
 
             modelBuilder.Entity("Ali25_V10.Data.Modelos.WConfig", b =>

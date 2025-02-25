@@ -1,4 +1,3 @@
-@page "/Clientes/Folios"
 @inherits FoliosBase
 @rendermode InteractiveServer
 
@@ -10,16 +9,24 @@
             <div class="d-flex justify-content-between align-items-center">
                 <h3>Folios</h3>
                 <div>
+                    <RadzenButton Click="@(() => NavigationManager.NavigateTo("/"))"
+                                Icon="arrow_back"
+                                ButtonStyle="ButtonStyle.Secondary"
+                                class="me-2">
+                        Regresar
+                    </RadzenButton>
                     <RadzenButton Click="@InsertRow"
                                 Icon="add"
                                 ButtonStyle="ButtonStyle.Success"
-                                class="me-2">
+                                class="me-2"
+                                Disabled="@isLoading">
                         Nuevo Folio
                     </RadzenButton>
-                    <RadzenButton Click="@(() => gridFolios.Reload())"
+                    <RadzenButton Click="@RefreshData"
                                 Icon="refresh"
-                                ButtonStyle="ButtonStyle.Light">
-                        Refrescar
+                                ButtonStyle="ButtonStyle.Light"
+                                Disabled="@(isLoading || isRefreshing)">
+                        @(isRefreshing ? "Actualizando..." : "Refrescar")
                     </RadzenButton>
                 </div>
             </div>
@@ -28,13 +35,34 @@
 
     @if (!string.IsNullOrEmpty(errorMessage))
     {
-        <div class="alert alert-danger">@errorMessage</div>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @errorMessage
+            <button type="button" class="btn-close" @onclick="@(() => errorMessage = null)"></button>
+        </div>
+    }
+
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" @bind="bypassCache" id="bypassCache">
+                <label class="form-check-label" for="bypassCache">
+                    Forzar recarga de datos
+                </label>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        </div>
     }
 
     <RadzenDataGrid @ref="gridFolios"
-                   TItem="W220_Folios"
                    Data="@folios"
                    Count="@count"
+                   TItem="W220_Folios"
                    AllowFiltering="true"
                    AllowColumnResize="true"
                    AllowAlternatingRows="false"
@@ -44,94 +72,221 @@
                    AllowPaging="true"
                    PagerHorizontalAlign="HorizontalAlign.Left"
                    ShowPagingSummary="true"
-                   EditMode="DataGridEditMode.Single"
-                   RowCreate="@OnCreateRow"
-                   RowUpdate="@OnUpdateRow"
+                   EditMode="@editMode"
+                   LoadingIndicator="true"
+                   IsLoading="@isLoading"
                    class="rz-shadow-3">
         <Columns>
-            <RadzenDataGridColumn TItem="W220_Folios" Property="Folio" Title="Folio" Width="100px" />
- 
-            <RadzenDataGridColumn TItem="W220_Folios" Property="FechaFolio" Title="Fecha" Width="150px">
-                <Template Context="data">
-                    @data.FechaFolio.ToString("dd/MM/yyyy")
+            <RadzenDataGridColumn TItem="W220_Folios" Property="Folio" Title="Folio" Width="120px">
+                <EditTemplate Context="folio">
+                    <RadzenTextBox @bind-Value="folio.Folio" Style="width:100%" Name="Folio" />
+                    <RadzenRequiredValidator Component="Folio" Text="El folio es requerido" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="W220_Folios" Property="FechaFolio" Title="Fecha Folio" Width="150px">
+                <Template Context="folio">
+                    @folio.FechaFolio.ToString("dd/MM/yyyy")
                 </Template>
-                <EditTemplate Context="data">
-                    <RadzenDatePicker @bind-Value="data.FechaFolio" 
+                <EditTemplate Context="folio">
+                    <RadzenDatePicker @bind-Value="folio.FechaFolio" 
                                     DateFormat="dd/MM/yyyy"
                                     Style="width:100%" />
                 </EditTemplate>
             </RadzenDataGridColumn>
 
-            <RadzenDataGridColumn TItem="W220_Folios" Property="ClienteId" Title="Cliente">
-                <Template Context="data">
-                   <RadzenLabel Text="Arreglar  " />
+            <RadzenDataGridColumn TItem="W220_Folios" Property="ClienteId" Title="Cliente" Width="200px">
+                <Template Context="folio">
+                    @{
+                        var cliente = clientes?.FirstOrDefault(c => c.ClienteId == folio.ClienteId);
+                        var org = organizacionesClientes.FirstOrDefault(o => o.OrgId == cliente?.ClienteOrgId);
+                        @(org?.Comercial ?? "")
+                    }
                 </Template>
-                <EditTemplate Context="data">
-                    <RadzenDropDown @bind-Value="data.ClienteId"
-                                  Data="@clientes"
-                                  TextProperty="ClienteNombre"
-                                  ValueProperty="ClienteId"
+                <EditTemplate Context="folio">
+                    <RadzenDropDown @bind-Value="folio.ClienteId"
+                                  Data="@organizacionesClientes"
+                                  TextProperty="Comercial"
+                                  ValueProperty="OrgId"
                                   Style="width:100%"
-                                  FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
-                                  AllowFiltering="true"
-                                  Placeholder="Seleccione un cliente..." />
+                                  Name="Cliente" />
+                    <RadzenRequiredValidator Component="Cliente" Text="El cliente es requerido" />
                 </EditTemplate>
             </RadzenDataGridColumn>
 
-            <RadzenDataGridColumn TItem="W220_Folios" Property="FormatoId" Title="Formato">
-                <Template Context="data">
-                    @(formatos?.FirstOrDefault(f => f.FormatoId == data.FormatoId)?.FormatoNombre ?? "")
+            <RadzenDataGridColumn TItem="W220_Folios" Property="FormatoId" Title="Formato" Width="200px">
+                <Template Context="folio">
+                    @(formatos?.FirstOrDefault(f => f.FormatoId == folio.FormatoId)?.FormatoNombre ?? "")
                 </Template>
-                <EditTemplate Context="data">
-                    <RadzenDropDown @bind-Value="data.FormatoId"
+                <EditTemplate Context="folio">
+                    <RadzenDropDown @bind-Value="folio.FormatoId"
                                   Data="@formatos"
                                   TextProperty="FormatoNombre"
                                   ValueProperty="FormatoId"
                                   Style="width:100%"
-                                  FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
-                                  AllowFiltering="true"
-                                  Placeholder="Seleccione un formato..." />
+                                  Name="Formato" />
                 </EditTemplate>
             </RadzenDataGridColumn>
 
             <RadzenDataGridColumn TItem="W220_Folios" Property="Estado" Title="Estado" Width="100px">
-                <Template Context="data">
-                    <RadzenLabel Text="@(data.Estado == 5 ? "Activo" : "Pendiente")" />
-                                
+                <Template Context="folio">
+                    @if (folio.Estado <= 0)
+                    {
+                        @("Inactivo")
+                    }
+                    else if (folio.Estado < 5)
+                    {
+                        @("Pendiente")
+                    }
+                    else
+                    {
+                        @("Activo")
+                    }
                 </Template>
-                <EditTemplate Context="data">
-                    
+                <EditTemplate Context="folio">
+                    <RadzenDropDown @bind-Value="folio.Estado" 
+                                  Data="@estados"
+                                  TextProperty="Value"
+                                  ValueProperty="Key"
+                                  Style="width:100%" />
                 </EditTemplate>
             </RadzenDataGridColumn>
 
-            <RadzenDataGridColumn TItem="W220_Folios" Width="160px" Sortable="false" Filterable="false">
-                <Template Context="data">
-                    <RadzenButton Icon="edit"
+            <RadzenDataGridColumn TItem="W220_Folios" Width="70px" Sortable="false" Filterable="false">
+                <Template Context="folio">
+                    <RadzenButton Icon="edit" 
                                 ButtonStyle="ButtonStyle.Light"
                                 Variant="Variant.Flat"
                                 Size="ButtonSize.Medium"
-                                Click="@(() => EditRow(data))"
-                                class="me-1" />
-                    <RadzenButton Icon="list"
-                                ButtonStyle="ButtonStyle.Info"
-                                Variant="Variant.Flat"
-                                Size="ButtonSize.Medium"
-                                Click="@(() => NavigationManager.NavigateTo($"/Clientes/FolioDetalle/{data.FolioId}"))" />
+                                Click="@(() => EditRow(folio))"
+                                Disabled="@(isLoading || isEditing)" />
                 </Template>
-                <EditTemplate Context="data">
-                    <RadzenButton Icon="check"
+                <EditTemplate Context="folio">
+                    <RadzenButton Icon="check" 
                                 ButtonStyle="ButtonStyle.Success"
                                 Variant="Variant.Flat"
                                 Size="ButtonSize.Small"
-                                Click="@(() => SaveRow(data))"
-                                class="me-1" />
-                    <RadzenButton Icon="close"
+                                Click="@(() => SaveRow(folio))" />
+                    <RadzenButton Icon="close" 
                                 ButtonStyle="ButtonStyle.Light"
                                 Variant="Variant.Flat"
                                 Size="ButtonSize.Small"
-                                Click="@(() => CancelEdit(data))" />
+                                Click="@(() => CancelEdit(folio))" />
                 </EditTemplate>
             </RadzenDataGridColumn>
         </Columns>
     </RadzenDataGrid>
-</div> 
+</div>
+
+@code {
+    protected Dictionary<int, string> estados = new()
+    {
+        { 0, "Inactivo" },
+        { 1, "Pendiente" },
+        { 5, "Activo" }
+    };
+
+    protected void Reset(W220_Folios folio)
+    {
+        foliosToInsert.Remove(folio);
+        foliosToUpdate.Remove(folio);
+    }
+
+    protected void Reset()
+    {
+        foliosToInsert.Clear();
+        foliosToUpdate.Clear();
+    }
+
+    protected async Task InsertRow()
+    {
+        if (gridFolios?.EditMode == DataGridEditMode.Single)
+        {
+            Reset();
+        }
+
+        var now = DateTime.Now;
+        var folio = new W220_Folios(
+            fechaFolio: now,
+            fechaCaptura: now,
+            clienteId: "",
+            formatoId: "",
+            orgId: CurrentUser.OrgId,
+            estado: 5,
+            status: true
+        );
+        
+        foliosToInsert.Add(folio);
+        await gridFolios.InsertRow(folio);
+    }
+
+    protected async Task EditRow(W220_Folios folio)
+    {
+        if (gridFolios?.EditMode == DataGridEditMode.Single)
+        {
+            Reset();
+        }
+        foliosToUpdate.Add(folio);
+        await gridFolios.EditRow(folio);
+        isEditing = true;
+    }
+
+    protected async Task SaveRow(W220_Folios folio)
+    {
+        try
+        {
+            if (foliosToInsert.Contains(folio))
+            {
+                var result = await RepoFolios.Insert(folio, CurrentUser.OrgId, CurrentUser, _ctsOperations.Token);
+                if (!result.Exito)
+                {
+                    throw new Exception(result.Texto);
+                }
+
+                await RepoBitacora.AddBitacora(
+                    userId: CurrentUser.Id,
+                    desc: $"Se creó el folio {folio.Folio}",
+                    orgId: CurrentUser.OrgId,
+                    cancellationToken: _ctsBitacora.Token
+                );
+
+                foliosToInsert.Remove(folio);
+            }
+            else if (foliosToUpdate.Contains(folio))
+            {
+                var result = await RepoFolios.Update(folio, CurrentUser.OrgId, CurrentUser, _ctsOperations.Token);
+                if (!result.Exito)
+                {
+                    throw new Exception(result.Texto);
+                }
+
+                await RepoBitacora.AddBitacora(
+                    userId: CurrentUser.Id,
+                    desc: $"Se actualizó el folio {folio.Folio}",
+                    orgId: CurrentUser.OrgId,
+                    cancellationToken: _ctsBitacora.Token
+                );
+
+                foliosToUpdate.Remove(folio);
+            }
+
+            await gridFolios.UpdateRow(folio);
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            await LogError(ex, "SaveRow");
+        }
+        finally
+        {
+            isEditing = false;
+        }
+    }
+
+    protected void CancelEdit(W220_Folios folio)
+    {
+        Reset(folio);
+        gridFolios.CancelEditRow(folio);
+        isEditing = false;
+    }
+} 

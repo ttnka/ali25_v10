@@ -9,204 +9,304 @@
 
 @if (CurrentUser.Nivel < 5)
 {
-    <div class="alert alert-warning">
-        No tiene permisos para acceder a esta página
+    <div class="alert alert-warning" role="alert">
+        No tiene permisos para acceder a esta página.
     </div>
     return;
 }
 
 <div class="container-fluid">
-    @if (CurrentUser.Nivel >= 5)
-    {
-        <hr style="border: 1px solid black; margin: 20px 0;" />
-        <RadzenAccordion>
-            <Items>
-                <RadzenAccordionItem Text="Agregar Configuración" Icon="add_business"
-                                   CollapseTitle="Cerrar formulario" 
-                                   ExpandTitle="Agregar nueva configuración">
-                    <RadzenButton Click="@InsertRow"
-                                Icon="add"
-                                ButtonStyle="ButtonStyle.Success"
-                                Text="Agregar Configuración" />
-                </RadzenAccordionItem>
-            </Items>
-        </RadzenAccordion>
-        <hr style="border: 1px solid black; margin: 20px 0;" />
-    }
-
-    <div class="row mb-3 bg-light p-3 rounded">
-        <div class="col-md-4">
-            <RadzenFormField Text="Grupo" Style="width: 100%;">
-                <RadzenTextBox @bind-Value="@selectedGrupo"
-                             Style="width: 100%"
-                             Placeholder="Filtrar por grupo..." />
-            </RadzenFormField>
-        </div>
-        <div class="col-md-6">
-            <RadzenFormField Text="Tipo" Style="width: 100%;">
-                <RadzenTextBox @bind-Value="@selectedTipo"
-                             Style="width: 100%"
-                             Placeholder="Filtrar por tipo..." />
-            </RadzenFormField>
-        </div>
-        <div class="col-md-2 d-flex align-items-end">
-            <RadzenButton Click="@RefreshData" 
-                         Icon="refresh" 
-                         ButtonStyle="@(isRefreshing ? ButtonStyle.Light : ButtonStyle.Primary)"
-                         Disabled="@isRefreshing"
-                         Style="width: 100%">
+    <div class="row mb-2">
+        <div class="col-12">
+            <RadzenButton Click=@(() => NavigationManager.NavigateTo("/configuracion"))
+                         Icon="arrow_back"
+                         ButtonStyle="ButtonStyle.Light"
+                         class="me-1">
+                Regresar
+            </RadzenButton>
+            <RadzenButton Click=@RefreshData
+                         Icon="refresh"
+                         ButtonStyle="ButtonStyle.Light"
+                         class="me-1"
+                         Disabled=@(isLoading || isRefreshing)>
                 @(isRefreshing ? "Actualizando..." : "Refrescar")
+            </RadzenButton>
+            <RadzenButton Click=@ToggleBypassCache
+                         Icon="cached"
+                         ButtonStyle="ButtonStyle.Light"
+                         class="me-1">
+                @(bypassCache ? "Sin Caché" : "Con Caché")
             </RadzenButton>
         </div>
     </div>
 
     @if (!string.IsNullOrEmpty(errorMessage))
     {
-        <div class="alert alert-danger">@errorMessage</div>
-    }
-
-    @if (isLoading)
-    {
-        <div class="text-center">
-            <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        <div class="row mb-2">
+            <div class="col-12">
+                <div class="alert alert-danger" role="alert">
+                    @errorMessage
+                </div>
+            </div>
         </div>
     }
-    else
+
+    <div class="row">
+        <div class="col-12">
+            <RadzenDataGrid @ref="gridConfig"
+                          Data="@configs"
+                          Count="@count"
+                          TItem="WConfig"
+                          AllowFiltering="true"
+                          AllowPaging="true"
+                          AllowSorting="true"
+                          EditMode="editMode"
+                          PageSize="10"
+                          class="w-100">
+                <Columns>
+                    <RadzenDataGridColumn TItem="WConfig" Context="config" Width="70px">
+                        <Template>
+                            @if (!isEditing)
+                            {
+                                <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Class="m-1" Click=@(() => EditRow(config)) />
+                            }
+                        </Template>
+                        <EditTemplate Context="config">
+                            <RadzenButton Icon="check" ButtonStyle="ButtonStyle.Success" Class="m-1" Click=@(() => SaveRow(config)) />
+                            <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Light" Class="m-1" Click=@(() => CancelEdit(config)) />
+                        </EditTemplate>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="WConfig" Property="Grupo" Title="Grupo" Width="120px">
+                        <Template Context="config">
+                            @config.Grupo
+                        </Template>
+                        <EditTemplate Context="config">
+                            <RadzenTextBox @bind-Value="config.Grupo" Style="width: 100%;" Name="Grupo" />
+                        </EditTemplate>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="WConfig" Property="Clave" Title="Clave" Width="120px">
+                        <Template Context="config">
+                            @config.Clave
+                        </Template>
+                        <EditTemplate Context="config">
+                            <RadzenTextBox @bind-Value="config.Clave" Style="width: 100%;" Name="Clave" />
+                        </EditTemplate>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="WConfig" Property="Titulo" Title="Título">
+                        <Template Context="config">
+                            @config.Titulo
+                        </Template>
+                        <EditTemplate Context="config">
+                            <RadzenTextBox @bind-Value="config.Titulo" Style="width: 100%;" Name="Titulo" />
+                        </EditTemplate>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="WConfig" Property="Descripcion" Title="Descripción">
+                        <Template Context="config">
+                            @config.Descripcion
+                        </Template>
+                        <EditTemplate Context="config">
+                            <RadzenTextArea @bind-Value="config.Descripcion" Style="width: 100%;" Name="Descripcion" />
+                        </EditTemplate>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="WConfig" Property="Tipo" Title="Tipo" Width="80px">
+                        <Template Context="config">
+                            @config.Tipo
+                        </Template>
+                        <EditTemplate Context="config">
+                            <RadzenTextBox @bind-Value="config.Tipo" Style="width: 100%;" Name="Tipo" />
+                        </EditTemplate>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="WConfig" Property="Numero" Title="Número" Width="100px">
+                        <Template Context="config">
+                            @config.Numero
+                        </Template>
+                        <EditTemplate Context="config">
+                            <RadzenNumeric @bind-Value="config.Numero" Style="width: 100%;" Name="Numero" />
+                        </EditTemplate>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="WConfig" Property="Texto" Title="Texto">
+                        <Template Context="config">
+                            @config.Texto
+                        </Template>
+                        <EditTemplate Context="config">
+                            <RadzenTextArea @bind-Value="config.Texto" Style="width: 100%;" Name="Texto" />
+                        </EditTemplate>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="WConfig" Property="EsGrupo" Title="Es Grupo" Width="100px">
+                        <Template Context="config">
+                            <RadzenCheckBox @bind-Value="config.EsGrupo" Disabled="true" />
+                        </Template>
+                        <EditTemplate Context="config">
+                            <RadzenCheckBox @bind-Value="config.EsGrupo" />
+                        </EditTemplate>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="WConfig" Property="Global" Title="Global" Width="100px">
+                        <Template Context="config">
+                            <RadzenCheckBox @bind-Value="config.Global" Disabled="true" />
+                        </Template>
+                        <EditTemplate Context="config">
+                            <RadzenCheckBox @bind-Value="config.Global" />
+                        </EditTemplate>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="WConfig" Property="Estado" Title="Estado" Width="100px">
+                        <Template Context="config">
+                            <RadzenBadge BadgeStyle="@(config.Estado == 5 ? BadgeStyle.Success : BadgeStyle.Warning)" 
+                                       Text="@(config.Estado == 5 ? "Activo" : "Inactivo")" />
+                        </Template>
+                        <EditTemplate Context="config">
+                            <RadzenNumeric @bind-Value="config.Estado" Style="width: 100%;" Name="Estado" />
+                        </EditTemplate>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        </div>
+    </div>
+</div>
+
+@code {
+    protected void Reset(WConfig config)
     {
-        <RadzenDataGrid @ref="gridConfig"
-                       Data="@configs"
-                       TItem="WConfig"
-                       AllowFiltering="true"
-                       AllowPaging="true"
-                       PageSize="50"
-                       AllowSorting="true"
-                       AllowColumnResize="true"
-                       FilterMode="FilterMode.Advanced"
-                       PagerHorizontalAlign="HorizontalAlign.Left"
-                       ShowPagingSummary="true"
-                       EditMode="@editMode"
-                       RowCreate="@OnCreateRow"
-                       RowUpdate="@OnUpdateRow"
-                       class="rz-shadow-3">
-            <Columns>
-                <RadzenDataGridColumn TItem="WConfig" Property="Grupo" Title="Grupo">
-                    <EditTemplate Context="config">
-                        <RadzenTextBox @bind-Value="config.Grupo" Style="width:100%" />
-                        <RadzenRequiredValidator Component="Grupo" Text="Grupo es requerido" />
-                    </EditTemplate>
-                </RadzenDataGridColumn>
+        configsToInsert.Remove(config);
+        configsToUpdate.Remove(config);
+    }
 
-                <RadzenDataGridColumn TItem="WConfig" Property="Clave" Title="Clave">
-                    <EditTemplate Context="config">
-                        <RadzenTextBox @bind-Value="config.Clave" Style="width:100%" />
-                        <RadzenRequiredValidator Component="Clave" Text="Clave es requerida" />
-                    </EditTemplate>
-                </RadzenDataGridColumn>
+    protected void Reset()
+    {
+        configsToInsert.Clear();
+        configsToUpdate.Clear();
+    }
 
-                <RadzenDataGridColumn TItem="WConfig" Property="Titulo" Title="Título">
-                    <EditTemplate Context="config">
-                        <RadzenTextBox @bind-Value="config.Titulo" Style="width:100%" />
-                        <RadzenRequiredValidator Component="Titulo" Text="Título es requerido" />
-                    </EditTemplate>
-                </RadzenDataGridColumn>
-
-                <RadzenDataGridColumn TItem="WConfig" Property="Descripcion" Title="Descripción">
-                    <EditTemplate Context="config">
-                        <RadzenTextArea @bind-Value="config.Descripcion" Style="width:100%" />
-                    </EditTemplate>
-                </RadzenDataGridColumn>
-
-                <RadzenDataGridColumn TItem="WConfig" Property="Tipo" Title="Tipo">
-                    <EditTemplate Context="config">
-                        <RadzenTextBox @bind-Value="config.Tipo" Style="width:100%" MaxLength="2" />
-                        <RadzenRequiredValidator Component="Tipo" Text="Tipo es requerido" />
-                    </EditTemplate>
-                </RadzenDataGridColumn>
-
-                <RadzenDataGridColumn TItem="WConfig" Property="Numero" Title="Número">
-                    <EditTemplate Context="config">
-                        <RadzenNumeric @bind-Value="config.Numero" Style="width:100%" />
-                    </EditTemplate>
-                </RadzenDataGridColumn>
-
-                <RadzenDataGridColumn TItem="WConfig" Property="Texto" Title="Texto">
-                    <EditTemplate Context="config">
-                        <RadzenTextBox @bind-Value="config.Texto" Style="width:100%" />
-                    </EditTemplate>
-                </RadzenDataGridColumn>
-
-                <RadzenDataGridColumn TItem="WConfig" Property="EsGrupo" Title="Es Grupo">
-                    <Template Context="config">
-                        <RadzenLabel Text="@(config.EsGrupo ? "Si" : "No")" />
-                    </Template>
-                    <EditTemplate Context="config">
-                        <RadzenSwitch @bind-Value="config.EsGrupo" />
-                    </EditTemplate>
-                </RadzenDataGridColumn>
-
-                <RadzenDataGridColumn TItem="WConfig" Property="Global" Title="Global">
-                    <Template Context="config">
-                        <RadzenLabel Text="@(config.Global ? "Si" : "No")" />
-                    </Template>
-                    <EditTemplate Context="config">
-                        <RadzenSwitch @bind-Value="config.Global" />
-                    </EditTemplate>
-                </RadzenDataGridColumn>
-
-                <RadzenDataGridColumn TItem="WConfig" Property="Estado" Title="Estado">
-                    <Template Context="config">
-                        <RadzenBadge BadgeStyle="@GetEstadoBadgeStyle(config.Estado)" 
-                                    Text="@GetEstadoText(config.Estado)" />
-                    </Template>
-                    <EditTemplate Context="config">
-                        <RadzenNumeric @bind-Value="config.Estado" Style="width:100%" />
-                    </EditTemplate>
-                </RadzenDataGridColumn>
-
-                <RadzenDataGridColumn TItem="WConfig" Context="config" 
-                                    Filterable="false" 
-                                    Sortable="false" 
-                                    TextAlign="TextAlign.Center" 
-                                    Width="100px">
-                    <Template Context="config">
-                        @if (ListaEdit)
-                        {
-                            <RadzenButton Icon="edit" 
-                                        ButtonStyle="ButtonStyle.Light" 
-                                        Variant="Variant.Flat"
-                                        Size="ButtonSize.Medium"
-                                        Click="@(() => EditRow(config))"
-                                        Disabled="@isEditing" />
-                        }
-                    </Template>
-                    <EditTemplate Context="config">
-                        <RadzenButton Icon="check" 
-                                    ButtonStyle="ButtonStyle.Success" 
-                                    Variant="Variant.Flat"
-                                    Size="ButtonSize.Medium"
-                                    Click="@(() => SaveRow(config))" />
-                        <RadzenButton Icon="close" 
-                                    ButtonStyle="ButtonStyle.Light" 
-                                    Variant="Variant.Flat"
-                                    Size="ButtonSize.Medium"
-                                    Click="@(() => CancelEdit(config))" />
-                        <RadzenButton Icon="delete" 
-                                    ButtonStyle="ButtonStyle.Danger" 
-                                    Variant="Variant.Flat"
-                                    Size="ButtonSize.Medium"
-                                    Click="@(() => DeleteRow(config))" />
-                    </EditTemplate>
-                </RadzenDataGridColumn>
-            </Columns>
-        </RadzenDataGrid>
-
-        @if (CurrentUser.Nivel >= 5)
+    protected async Task EditRow(WConfig config)
+    {
+        if (gridConfig?.EditMode == DataGridEditMode.Single)
         {
-            <RadzenButton Click="@ToggleBypassCache"
-                         Text="@(bypassCache ? "Lectura" : "Forzar Lectura")"  
-                         ButtonStyle="ButtonStyle.Light"
-                         class="me-2"
-                         Disabled="@isRefreshing" />
+            Reset();
+        }
+        configsToUpdate.Add(config);
+        await gridConfig.EditRow(config);
+    }
+
+    protected async Task SaveRow(WConfig config)
+    {
+        await gridConfig.UpdateRow(config);
+    }
+
+    protected void CancelEdit(WConfig config)
+    {
+        Reset(config);
+        gridConfig.CancelEditRow(config);
+    }
+
+    protected async Task DeleteRow(WConfig config)
+    {
+        try 
+        {
+            Reset(config);
+            if (configs?.Contains(config) == true)
+            {
+                config.Estado = 0;
+                var result = await RepoConfig.Update(
+                    config,
+                    CurrentUser.OrgId,
+                    CurrentUser,
+                    _ctsOperations.Token
+                );
+
+                if (!result.Exito)
+                {
+                    throw new Exception(result.Texto);
+                }
+
+                await RepoBitacora.AddBitacora(
+                    userId: CurrentUser.Id,
+                    desc: $"Configuración eliminada: {config.Titulo}",
+                    orgId: CurrentUser.OrgId,
+                    cancellationToken: _ctsOperations.Token
+                );
+
+                await gridConfig.Reload();
+            }
+            else
+            {
+                gridConfig.CancelEditRow(config);
+                await gridConfig.Reload();
+            }
+        }
+        catch (Exception ex)
+        {
+            await LogError(ex, "DeleteRow");
         }
     }
-</div> 
+
+    protected async Task OnCreateRow(WConfig config)
+    {
+        try
+        {
+            var result = await RepoConfig.Insert(
+                config,
+                CurrentUser.OrgId,
+                CurrentUser,
+                _ctsOperations.Token
+            );
+
+            if (!result.Exito)
+            {
+                throw new Exception(result.Texto);
+            }
+
+            await RepoBitacora.AddBitacora(
+                userId: CurrentUser.Id,
+                desc: $"Se creó la configuración {config.Titulo}",
+                orgId: CurrentUser.OrgId,
+                cancellationToken: _ctsOperations.Token
+            );
+
+            configsToInsert.Remove(config);
+        }
+        catch (Exception ex)
+        {
+            await LogError(ex, "OnCreateRow");
+        }
+    }
+
+    protected async Task OnUpdateRow(WConfig config)
+    {
+        try
+        {
+            Reset(config);
+
+            var result = await RepoConfig.Update(
+                config,
+                CurrentUser.OrgId,
+                CurrentUser,
+                _ctsOperations.Token
+            );
+
+            if (!result.Exito)
+            {
+                throw new Exception(result.Texto);
+            }
+
+            await RepoBitacora.AddBitacora(
+                userId: CurrentUser.Id,
+                desc: $"Se actualizó la configuración {config.Titulo}",
+                orgId: CurrentUser.OrgId,
+                cancellationToken: _ctsOperations.Token
+            );
+        }
+        catch (Exception ex)
+        {
+            await LogError(ex, "OnUpdateRow");
+        }
+    }
+} 

@@ -1,0 +1,239 @@
+@page "/configuracion/productos"
+@inherits ProductosBase
+@rendermode InteractiveServer
+
+<PageTitle>Productos</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-12">
+            <RadzenButton Click="@(() => { })"
+                         Icon="arrow_back"
+                         ButtonStyle="ButtonStyle.Light"
+                         Text="Regresar" />
+        </div>
+    </div>
+
+    <div class="row mb-3 bg-light p-3 rounded">
+        <div class="col-md-2 d-flex align-items-end">
+            <RadzenButton Click="@RefreshData" 
+                         Icon="refresh" 
+                         ButtonStyle="@(isRefreshing ? ButtonStyle.Light : ButtonStyle.Primary)"
+                         Disabled="@isRefreshing"
+                         Style="width: 100%">
+                @(isRefreshing ? "Actualizando..." : "Refrescar")
+            </RadzenButton>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+            <RadzenButton Click="@ToggleBypassCache"
+                         Icon="cached"
+                         ButtonStyle="@(bypassCache ? ButtonStyle.Secondary : ButtonStyle.Light)"
+                         Style="width: 100%">
+                @(bypassCache ? "Con Caché" : "Sin Caché")
+            </RadzenButton>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        </div>
+    }
+    else
+    {
+        <RadzenDataGrid @ref="gridProductos"
+                       Data="@productos"
+                       Count="@count"
+                       TItem="W281_Productos"
+                       AllowFiltering="true"
+                       AllowPaging="true"
+                       PageSize="10"
+                       AllowSorting="true"
+                       AllowColumnResize="true"
+                       FilterMode="FilterMode.Advanced"
+                       PagerHorizontalAlign="HorizontalAlign.Left"
+                       ShowPagingSummary="true"
+                       EditMode="@editMode"
+                       class="rz-shadow-3">
+            <Columns>
+                <RadzenDataGridColumn TItem="W281_Productos" Context="producto" Width="70px">
+                    <Template>
+                        @if (ListaEdit)
+                        {
+                            <RadzenButton Icon="edit" 
+                                        ButtonStyle="ButtonStyle.Light" 
+                                        Variant="Variant.Flat"
+                                        Size="ButtonSize.Medium"
+                                        Click="@(() => EditRow(producto))"
+                                        Disabled="@(isLoading || isEditing)" />
+                        }
+                    </Template>
+                    <EditTemplate>
+                        <RadzenButton Icon="check" 
+                                    ButtonStyle="ButtonStyle.Success"
+                                    Variant="Variant.Flat"
+                                    Size="ButtonSize.Small"
+                                    Click="@(() => SaveRow(producto))" />
+                        <RadzenButton Icon="close" 
+                                    ButtonStyle="ButtonStyle.Light"
+                                    Variant="Variant.Flat"
+                                    Size="ButtonSize.Small"
+                                    Click="@(() => CancelEdit(producto))" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="W281_Productos" Property="Titulo" Title="Título">
+                    <EditTemplate Context="producto">
+                        <RadzenTextBox @bind-Value="producto.Titulo" Style="width:100%" Name="Titulo" />
+                        <RadzenRequiredValidator Component="Titulo" Text="El título es requerido" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="W281_Productos" Property="Descripcion" Title="Descripción">
+                    <EditTemplate Context="producto">
+                        <RadzenTextArea @bind-Value="producto.Descripcion" Style="width:100%" Name="Descripcion" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="W281_Productos" Property="Estado" Title="Estado" Width="100px">
+                    <Template Context="producto">
+                        <RadzenBadge BadgeStyle="@GetEstadoBadgeStyle(producto.Estado)" 
+                                    Text="@GetEstadoText(producto.Estado)" />
+                    </Template>
+                    <EditTemplate Context="producto">
+                        <RadzenDropDown @bind-Value="producto.Estado" 
+                                      Data="@estados"
+                                      TextProperty="Value"
+                                      ValueProperty="Key"
+                                      Style="width:100%" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    }
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger mt-3">
+        @errorMessage
+    </div>
+}
+
+@code {
+    protected BadgeStyle GetEstadoBadgeStyle(int estado) => estado switch
+    {
+        <= 0 => BadgeStyle.Danger,
+        < 5 => BadgeStyle.Warning,
+        5 => BadgeStyle.Success,
+        _ => BadgeStyle.Info
+    };
+
+    protected string GetEstadoText(int estado) => estado switch
+    {
+        <= 0 => "Inactivo",
+        < 5 => "Pendiente",
+        5 => "Activo",
+        _ => "Especial"
+    };
+
+    protected Dictionary<int, string> estados = new()
+    {
+        { 0, "Inactivo" },
+        { 1, "Pendiente" },
+        { 5, "Activo" }
+    };
+
+    protected void Reset(W281_Productos producto)
+    {
+        productosToInsert.Remove(producto);
+        productosToUpdate.Remove(producto);
+    }
+
+    protected void Reset()
+    {
+        productosToInsert.Clear();
+        productosToUpdate.Clear();
+    }
+
+    protected async Task EditRow(W281_Productos producto)
+    {
+        if (gridProductos?.EditMode == DataGridEditMode.Single)
+        {
+            Reset();
+        }
+        productosToUpdate.Add(producto);
+        await gridProductos.EditRow(producto);
+    }
+
+    protected async Task SaveRow(W281_Productos producto)
+    {
+        await gridProductos.UpdateRow(producto);
+    }
+
+    protected void CancelEdit(W281_Productos producto)
+    {
+        Reset(producto);
+        gridProductos.CancelEditRow(producto);
+    }
+
+    protected async Task DeleteRow(W281_Productos producto)
+    {
+        try 
+        {
+            Reset(producto);
+            if (productos?.Contains(producto) == true)
+            {
+                producto.Estado = 0;
+                var result = await RepoProductos.Update(
+                    producto,
+                    CurrentUser.OrgId,
+                    CurrentUser
+                );
+
+                if (!result.Exito)
+                {
+                    throw new Exception(result.Texto);
+                }
+
+                await RepoBitacora.AddBitacora(
+                    userId: CurrentUser.Id,
+                    desc: $"Se eliminó el producto {producto.Titulo}",
+                    orgId: CurrentUser.OrgId
+                );
+
+                await gridProductos.Reload();
+            }
+            else
+            {
+                gridProductos.CancelEditRow(producto);
+                await gridProductos.Reload();
+            }
+        }
+        catch (Exception ex)
+        {
+            await LogError(ex, "DeleteRow");
+        }
+    }
+
+    protected async Task InsertRow()
+    {
+        if (gridProductos?.EditMode == DataGridEditMode.Single)
+        {
+            Reset();
+        }
+
+        var producto = new W281_Productos(
+            grupo: false,
+            clave: "NUEVO",
+            titulo: "Nuevo Producto",
+            descripcion: "Nuevo producto",
+            unidadMedida: "PZA",
+            estado: 5
+        );
+        
+        productosToInsert.Add(producto);
+        await gridProductos.InsertRow(producto);
+    }
+} 

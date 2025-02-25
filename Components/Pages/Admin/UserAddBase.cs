@@ -7,16 +7,19 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Linq;
+using Radzen;
+using Radzen.Blazor;
 
 namespace Ali25_V10.Components.Pages.Admin
 {
-    public class UserAddBase : ComponentBase
+    public class UserAddBase : ComponentBase, IDisposable
     {
         [CascadingParameter] protected ApplicationUser CurrentUser { get; set; } = default!;
         [Parameter] public string TipoOrg {get; set;} = "Vacio";
         [Inject] protected IRepo<ApplicationUser> RepoUser { get; set; } = default!;
         [Inject] protected UserManager<ApplicationUser> UserManager { get; set; } = default!;
         [Inject] protected IRepoBitacora RepoBitacora { get; set; } = default!;
+        [Inject] protected IRepo<W100_Org> RepoOrg { get; set; } = default!;
         [Parameter] public EventCallback<ApplicationUser> OnUserCreated { get; set; }
         [Parameter] public List<W100_Org> Orgs { get; set; } = new();
 
@@ -29,6 +32,63 @@ namespace Ali25_V10.Components.Pages.Admin
         protected bool isSaving;
         protected string? errorMessage;
         protected Dictionary<int, string> niveles = new();
+
+        protected IEnumerable<W100_Org>? organizaciones;
+        protected bool isLoading;
+
+        // Tokens para operaciones
+        private readonly CancellationTokenSource _ctsOperations = new(TimeSpan.FromSeconds(30));
+        private readonly CancellationTokenSource _ctsLogs = new(TimeSpan.FromSeconds(5));
+
+        protected override async Task OnInitializedAsync()
+        {
+            try
+            {
+                await LoadData();
+            }
+            catch (Exception ex)
+            {
+                await LogError(ex, "OnInitializedAsync");
+            }
+        }
+
+        protected async Task LoadData()
+        {
+            try
+            {
+                isLoading = true;
+                var result = await RepoOrg.Get(
+                    CurrentUser.OrgId,
+                    CurrentUser,
+                    cancellationToken: _ctsOperations.Token
+                );
+
+                if (result.Exito)
+                {
+                    organizaciones = result.DataVarios;
+                }
+            }
+            catch (Exception ex)
+            {
+                await LogError(ex, "LoadData");
+            }
+            finally
+            {
+                isLoading = false;
+            }
+        }
+
+        protected async Task LogError(Exception ex, string origen)
+        {
+            await RepoBitacora.AddLog(
+                userId: CurrentUser.Id,
+                desc: $"Error en {origen}: {ex.Message}",
+                tipoLog: "Error",
+                origen: $"UserAddBase.{origen}",
+                orgId: CurrentUser.OrgId,
+                cancellationToken: _ctsLogs.Token
+            );
+        }
 
         protected override void OnInitialized()
         {
@@ -166,6 +226,12 @@ namespace Ali25_V10.Components.Pages.Admin
             password = "";
             confirmPassword = "";
             errorMessage = null;
+        }
+
+        public void Dispose()
+        {
+            _ctsOperations.Dispose();
+            _ctsLogs.Dispose();
         }
     }
 } 

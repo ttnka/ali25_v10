@@ -54,27 +54,9 @@ public class ZArranqueBase : ComponentBase, IDisposable
     {
         try
         {
-            // Bitácora: Inicio de validación
-            var bitacora = new Z900_Bitacora(
-                userId: Usuario,
-                desc: "Iniciando proceso de ValidarArranque",
-                orgId: Organizacion
-            );
-            await BitacoraDb.Bitacoras.AddAsync(bitacora);
-            await BitacoraDb.SaveChangesAsync(_ctsOperations.Token);
-
             if (!Clave.Pass.Equals(Constantes.Arranque))
             {
                 intentos++;
-                // Bitácora: Intento fallido
-                var bitacoraIntento = new Z900_Bitacora(
-                    userId: Usuario,
-                    desc: $"02 Intento fallido de validación #{intentos}",
-                    orgId: Organizacion
-                );
-                await BitacoraDb.Bitacoras.AddAsync(bitacoraIntento);
-                await BitacoraDb.SaveChangesAsync(_ctsOperations.Token);
-
                 Error = true;
                 ErrorMessage = $"Clave incorrecta. Intento {intentos} de 3";
                 if (intentos >= 3)
@@ -84,24 +66,14 @@ public class ZArranqueBase : ComponentBase, IDisposable
                 return;
             }
 
-            var rfcAdmin = Constantes.RfcAdmin;
-            var rfcPublico = Constantes.PgRfc;
+            isLoading = true;
 
-            // Actualizado: Nombre del DbSet y agregado CancellationToken
+            // 1. Validar que no existan organizaciones
             var orgsExist = await AppDbContext.Organizaciones.AnyAsync(
-                o => o.Rfc == rfcAdmin || o.Rfc == rfcPublico,
+                o => o.Rfc == Constantes.RfcAdmin || o.Rfc == Constantes.PgRfc,
                 _ctsOperations.Token
             );
             
-            // Bitácora: Verificación de organizaciones
-            var bitacoraResultadoOrgs = new Z900_Bitacora(
-                userId: Usuario,
-                desc: $"03 Verificación de organizaciones existentes: {orgsExist}",
-                orgId: Organizacion
-            );
-            await BitacoraDb.Bitacoras.AddAsync(bitacoraResultadoOrgs);
-            await BitacoraDb.SaveChangesAsync(_ctsOperations.Token);
-
             if (orgsExist)
             {
                 Error = true;
@@ -109,80 +81,122 @@ public class ZArranqueBase : ComponentBase, IDisposable
                 return;
             }
 
-            // Actualizado: Nombre del DbSet y agregado CancellationToken
-            var configExist = await AppDbContext.Set<WConfig>().AnyAsync(_ctsOperations.Token);
-            if (configExist)
-            {
-                Error = true;
-                ErrorMessage = "Ya existen configuraciones en el sistema";
-                return;
-            }
-
-            // Crear organización Zuver
-            var orgZuver = new W100_Org
-            {
-                OrgId = Organizacion,
-                Rfc = rfcAdmin,
-                RazonSocial = "Zuver Works",
-                Comercial = "Zuver",
-                Estado = 5,
-                Status = true,
-                //Mail = "soporte@zuverworks.com"
-            };
-
-            // Bitácora: Creación Zuver
-            var bitacoraZuver = new Z900_Bitacora(
-                userId: Usuario,
-                desc: "04 Creando organización Zuver",
-                orgId: Organizacion
+            // 2. Crear organizaciones
+            var orgZuver = new W100_Org(
+                rfc: Constantes.RfcAdmin,
+                comercial: "Zuver",
+                razonSocial: Constantes.RazonSocialAdmin,
+                tipo: "Admin",
+                estado: Constantes.EstadoAdmin,
+                status: Constantes.StatusAdmin
             );
-            await BitacoraDb.Bitacoras.AddAsync(bitacoraZuver);
-            await BitacoraDb.SaveChangesAsync(_ctsOperations.Token);
 
-            // Actualizado: Nombre del DbSet y agregado CancellationToken
+            var orgPublico = new W100_Org(
+                rfc: Constantes.PgRfc,
+                comercial: "Público General",
+                razonSocial: Constantes.PgRazonSocial,
+                tipo: "Publico",
+                estado: Constantes.PgEstado,
+                status: Constantes.PgStatus
+            );
+
             await AppDbContext.Organizaciones.AddAsync(orgZuver, _ctsOperations.Token);
-            await AppDbContext.SaveChangesAsync(_ctsOperations.Token);
-
-            // Crear organización Público General
-            var orgPublico = new W100_Org
-            {
-                OrgId = "PGE010101AAA",
-                Rfc = rfcPublico,
-                RazonSocial = "Público General",
-                Comercial = "Público",
-                Estado = 5,
-                Status = true,
-                //Mail = "publico@pegia.mx"
-            };
-
-            // Bitácora: Creación Público General
-            var bitacoraPublico = new Z900_Bitacora(
-                userId: Usuario,
-                desc: "05 Creando organización Público General",
-                orgId: Organizacion
-            );
-            await BitacoraDb.Bitacoras.AddAsync(bitacoraPublico);
-            await BitacoraDb.SaveChangesAsync(_ctsOperations.Token);
-
-            // Actualizado: Nombre del DbSet y agregado CancellationToken
             await AppDbContext.Organizaciones.AddAsync(orgPublico, _ctsOperations.Token);
             await AppDbContext.SaveChangesAsync(_ctsOperations.Token);
+
+            // 3. Crear usuarios administradores
+            var adminUser = new ApplicationUser
+            {
+                Id = MyFunc.MyGuid("User"),
+                UserName = Constantes.AdminMail,
+                Email = Constantes.AdminMail,
+                Nombre = "Administrador",
+                Paterno = "Zuverworks",
+                Materno = "Sistema",
+                Nivel = 7,
+                OrgId = orgZuver.OrgId
+            };
+
+            var publicUser = new ApplicationUser
+            {
+                Id = MyFunc.MyGuid("User"),
+                UserName = Constantes.UserNameMailPublico,
+                Email = Constantes.DeMailPublico,
+                Nombre = "Usuario",
+                Paterno = "Público",
+                Nivel = 1,
+                OrgId = orgPublico.OrgId
+            };
+
+            var resultAdmin = await UserManager.CreateAsync(adminUser, Constantes.PasswordMail01); 
+            var resultPublic = await UserManager.CreateAsync(publicUser, Constantes.PasswordMail02);
+
+            if (!resultAdmin.Succeeded || !resultPublic.Succeeded)
+            {
+                throw new Exception("Error al crear usuarios administradores");
+            }
+
+            // 4. Crear configuraciones base
+            var configResult = await LasVariables();
+            if (!configResult.Exito)
+            {
+                throw new Exception("Error al crear configuraciones base");
+            }
+
+            // Guardar las configuraciones en la base de datos
+            await AppDbContext.Set<WConfig>().AddRangeAsync(configResult.DataVarios, _ctsOperations.Token);
+            await AppDbContext.SaveChangesAsync(_ctsOperations.Token);
+
+            // 5. Registrar en bitácora
+            var bitacora = new Z900_Bitacora(
+                userId: Usuario,
+                desc: "Sistema inicializado correctamente",
+                orgId: Organizacion
+            );
+            await BitacoraDb.Bitacoras.AddAsync(bitacora, _ctsOperations.Token);
+            await BitacoraDb.SaveChangesAsync(_ctsOperations.Token);
+
+            // 6. Registrar en log
+            var log = new Z910_Log(
+                userId: Usuario,
+                orgId: Organizacion,
+                desc: "Sistema inicializado correctamente",
+                tipoLog: "Info",
+                origen: "ZArranque.ValidarArranque"
+            );
+            await BitacoraDb.Set<Z910_Log>().AddAsync(log, _ctsOperations.Token);
+            await BitacoraDb.SaveChangesAsync(_ctsOperations.Token);
 
             Success = true;
         }
         catch (Exception ex)
         {
-            // Bitácora: Error
-            var bitacoraError = new Z900_Bitacora(
-                userId: Usuario,
-                desc: $"Error en ValidarArranque: {ex.Message}",
-                orgId: Organizacion
-            );
-            await BitacoraDb.Bitacoras.AddAsync(bitacoraError);
-            await BitacoraDb.SaveChangesAsync(_ctsOperations.Token);
-
             Error = true;
             ErrorMessage = ex.Message;
+            
+            // Registrar error en bitácora
+            var bitacoraError = new Z900_Bitacora(
+                userId: Usuario,
+                desc: $"Error al inicializar sistema: {ex.Message}",
+                orgId: Organizacion
+            );
+            await BitacoraDb.Bitacoras.AddAsync(bitacoraError, _ctsOperations.Token);
+
+            // Registrar error en log
+            var logError = new Z910_Log(
+                userId: Usuario,
+                orgId: Organizacion,
+                desc: $"Error al inicializar sistema: {ex.Message}\nStackTrace: {ex.StackTrace}",
+                tipoLog: "Error",
+                origen: "ZArranque.ValidarArranque"
+            );
+            await BitacoraDb.Set<Z910_Log>().AddAsync(logError, _ctsOperations.Token);
+            
+            await BitacoraDb.SaveChangesAsync(_ctsOperations.Token);
+        }
+        finally
+        {
+            isLoading = false;
         }
     }
 
@@ -253,6 +267,9 @@ public class ZArranqueBase : ComponentBase, IDisposable
             await PoblarElementos(grupos, Constantes.Calendario_Tipos,
                 "Todas,Actividad,Auditoria,Cumpleaños,Festivo,Reporte,Otros");
 
+            respuesta.Exito = true;
+            respuesta.DataVarios = grupos;
+            return respuesta;
         }
         catch (Exception ex)
         {

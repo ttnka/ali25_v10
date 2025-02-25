@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Ali25_V10.Data.Migrations.Application
 {
     /// <inheritdoc />
-    public partial class Inicial : Migration
+    public partial class Initial : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -80,6 +80,27 @@ namespace Ali25_V10.Data.Migrations.Application
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Clientes", x => x.ClienteId);
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "Conceptos",
+                columns: table => new
+                {
+                    ConceptoId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    FolioId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    ProductoId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Cantidad = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    Precio = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    Estado = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<bool>(type: "tinyint(1)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Conceptos", x => x.ConceptoId);
                 })
                 .Annotation("MySql:CharSet", "utf8mb4");
 
@@ -184,6 +205,30 @@ namespace Ali25_V10.Data.Migrations.Application
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateTable(
+                name: "FormatosDetalles",
+                columns: table => new
+                {
+                    FormatoDetId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    FormatoId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Orden = table.Column<int>(type: "int", nullable: false),
+                    Tipo = table.Column<string>(type: "longtext", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Campo = table.Column<string>(type: "longtext", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Descripcion = table.Column<string>(type: "longtext", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Estado = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<bool>(type: "tinyint(1)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_FormatosDetalles", x => x.FormatoDetId);
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
                 name: "FormatosGrupos",
                 columns: table => new
                 {
@@ -199,6 +244,28 @@ namespace Ali25_V10.Data.Migrations.Application
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_FormatosGrupos", x => x.FormatoGpoId);
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "ListaPrecios",
+                columns: table => new
+                {
+                    ListaPrecioId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    EsGlobal = table.Column<bool>(type: "tinyint(1)", nullable: false),
+                    Titulo = table.Column<string>(type: "varchar(25)", maxLength: 25, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Descripcion = table.Column<string>(type: "longtext", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    OrgId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Estado = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<bool>(type: "tinyint(1)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ListaPrecios", x => x.ListaPrecioId);
                 })
                 .Annotation("MySql:CharSet", "utf8mb4");
 
@@ -225,6 +292,50 @@ namespace Ali25_V10.Data.Migrations.Application
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Organizaciones", x => x.OrgId);
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "Precios",
+                columns: table => new
+                {
+                    PrecioId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    ListaPrecioId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    ProductoId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Precio = table.Column<decimal>(type: "decimal(10,2)", nullable: false),
+                    Estado = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<bool>(type: "tinyint(1)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Precios", x => x.PrecioId);
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "Productos",
+                columns: table => new
+                {
+                    ProductoId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Grupo = table.Column<bool>(type: "tinyint(1)", nullable: false),
+                    Clave = table.Column<string>(type: "varchar(15)", maxLength: 15, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Titulo = table.Column<string>(type: "varchar(50)", maxLength: 50, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Descripcion = table.Column<string>(type: "longtext", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    UnidadMedida = table.Column<string>(type: "varchar(25)", maxLength: 25, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Estado = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<bool>(type: "tinyint(1)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Productos", x => x.ProductoId);
                 })
                 .Annotation("MySql:CharSet", "utf8mb4");
 
@@ -490,6 +601,9 @@ namespace Ali25_V10.Data.Migrations.Application
                 name: "Clientes");
 
             migrationBuilder.DropTable(
+                name: "Conceptos");
+
+            migrationBuilder.DropTable(
                 name: "Configuraciones");
 
             migrationBuilder.DropTable(
@@ -502,7 +616,19 @@ namespace Ali25_V10.Data.Migrations.Application
                 name: "Formatos");
 
             migrationBuilder.DropTable(
+                name: "FormatosDetalles");
+
+            migrationBuilder.DropTable(
                 name: "FormatosGrupos");
+
+            migrationBuilder.DropTable(
+                name: "ListaPrecios");
+
+            migrationBuilder.DropTable(
+                name: "Precios");
+
+            migrationBuilder.DropTable(
+                name: "Productos");
 
             migrationBuilder.DropTable(
                 name: "AspNetRoles");

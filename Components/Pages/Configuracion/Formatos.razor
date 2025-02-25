@@ -1,12 +1,21 @@
-@page "/Configuracion/Formatos"
+@page "/configuracion/formatos"
 @inherits FormatosBase
 @rendermode InteractiveServer
 
 <PageTitle>Formatos</PageTitle>
 
 <div class="container-fluid">
+    @if (isLoading)
+    {
+        <div class="row">
+            <div class="col">
+                <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+            </div>
+        </div>
+    }
+
     <div class="row mb-3">
-        <div class="col-12">
+        <div class="col">
             <div class="d-flex justify-content-between align-items-center">
                 <h3>Formatos</h3>
                 <div>
@@ -16,17 +25,30 @@
                                 class="me-2">
                         Regresar
                     </RadzenButton>
-                    <RadzenButton Click="@OnCreateRow"
+                    
+                    <RadzenButton Click="@InsertRow"
                                 Icon="add"
                                 ButtonStyle="ButtonStyle.Success"
-                                class="me-2">
+                                class="me-2"
+                                Disabled="@isLoading">
                         Nuevo Formato
                     </RadzenButton>
-                    <RadzenButton Click="@(() => gridFormatos.Reload())"
+
+                    <RadzenButton Click="@RefreshData"
                                 Icon="refresh"
-                                ButtonStyle="ButtonStyle.Light">
-                        Refrescar
+                                ButtonStyle="@(isRefreshing ? ButtonStyle.Light : ButtonStyle.Primary)"
+                                Variant="Variant.Filled"
+                                Disabled="@isRefreshing">
+                        @(isRefreshing ? "Actualizando..." : "Refrescar")
                     </RadzenButton>
+
+                    @if (CurrentUser?.Nivel >= 5)
+                    {
+                        <RadzenButton Click="@ToggleBypassCache"
+                                    Text=@(bypassCache ? "Lectura" : "Forzar Lectura")
+                                    ButtonStyle=@(bypassCache ? ButtonStyle.Warning : ButtonStyle.Info)
+                                    class="mx-2" />
+                    }
                 </div>
             </div>
         </div>
@@ -34,7 +56,10 @@
 
     @if (!string.IsNullOrEmpty(errorMessage))
     {
-        <div class="alert alert-danger">@errorMessage</div>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @errorMessage
+            <button type="button" class="btn-close" @onclick="@(() => errorMessage = null)"></button>
+        </div>
     }
 
     <RadzenDataGrid @ref="gridFormatos"
@@ -50,22 +75,45 @@
                    AllowPaging="true"
                    PagerHorizontalAlign="HorizontalAlign.Left"
                    ShowPagingSummary="true"
-                   EditMode="DataGridEditMode.Single"
+                   EditMode="@editMode"
                    RowUpdate="@OnUpdateRow"
-                   RowCreate="@OnInsertRow"
                    LoadingIndicator="true"
                    IsLoading="@isLoading"
                    class="rz-shadow-3">
         <Columns>
+            <RadzenDataGridColumn TItem="W290_Formatos" Context="formato" Width="70px">
+                <Template>
+                    <RadzenButton Icon="edit" 
+                                ButtonStyle="ButtonStyle.Light" 
+                                Variant="Variant.Flat"
+                                Size="ButtonSize.Medium"
+                                Click="@(args => EditRow(formato))"
+                                Disabled="@(isLoading || isEditing)" />
+                </Template>
+                <EditTemplate>
+                    <RadzenButton Icon="check" 
+                                ButtonStyle="ButtonStyle.Success"
+                                Variant="Variant.Flat"
+                                Size="ButtonSize.Small"
+                                Click="@((args) => SaveRow(formato))" />
+                    <RadzenButton Icon="close" 
+                                ButtonStyle="ButtonStyle.Light"
+                                Variant="Variant.Flat"
+                                Size="ButtonSize.Small"
+                                Click="@((args) => CancelEdit(formato))" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
             <RadzenDataGridColumn TItem="W290_Formatos" Property="FormatoNombre" Title="Nombre">
                 <EditTemplate Context="formato">
-                    <RadzenTextBox @bind-Value="formato.FormatoNombre" Style="width:100%" />
+                    <RadzenTextBox @bind-Value="formato.FormatoNombre" Style="width:100%" Name="FormatoNombre" />
+                    <RadzenRequiredValidator Component="FormatoNombre" Text="El nombre es requerido" />
                 </EditTemplate>
             </RadzenDataGridColumn>
 
             <RadzenDataGridColumn TItem="W290_Formatos" Property="Descripcion" Title="Descripción">
                 <EditTemplate Context="formato">
-                    <RadzenTextArea @bind-Value="formato.Descripcion" Style="width:100%" />
+                    <RadzenTextArea @bind-Value="formato.Descripcion" Style="width:100%" Name="Descripcion" />
                 </EditTemplate>
             </RadzenDataGridColumn>
 
@@ -93,7 +141,8 @@
                                         ButtonStyle="ButtonStyle.Secondary"
                                         Variant="Variant.Flat"
                                         Size="ButtonSize.Small"
-                                        Click="@(() => ShowOrganizaciones(formato))" />
+                                        Click="@(() => ShowOrganizaciones(formato))"
+                                        Disabled="@isLoading" />
                         </div>
                     }
                 </Template>
@@ -101,67 +150,277 @@
 
             <RadzenDataGridColumn TItem="W290_Formatos" Property="Estado" Title="Estado" Width="100px">
                 <Template Context="formato">
-                    <RadzenLabel Text="CAMBIALO" />
-                                
+                    <span class="badge @(formato.Estado switch {
+                        <= 0 => "bg-danger",
+                        < 5 => "bg-warning",
+                        _ => "bg-success"
+                    })">
+                        @(formato.Estado switch {
+                            <= 0 => "Inactivo",
+                            < 5 => "Pendiente",
+                            _ => "Activo"
+                        })
+                    </span>
                 </Template>
                 <EditTemplate Context="formato">
-                    
+                    <RadzenDropDown @bind-Value="formato.Estado" 
+                                   Data="@estados"
+                                   TextProperty="Value"
+                                   ValueProperty="Key"
+                                   Style="width:100%" />
                 </EditTemplate>
-            </RadzenDataGridColumn>
-
-            <RadzenDataGridColumn TItem="W290_Formatos" Width="70px" Sortable="false" Filterable="false">
-                <Template Context="formato">
-                    <RadzenButton Icon="edit" 
-                                 ButtonStyle="ButtonStyle.Light"
-                                 Variant="Variant.Flat"
-                                 Size="ButtonSize.Medium"
-                                 Click="@(() => gridFormatos.EditRow(formato))" />
-                </Template>
-                <EditTemplate Context="formato">
-                    <RadzenButton Icon="check" 
-                                 ButtonStyle="ButtonStyle.Success"
-                                 Variant="Variant.Flat"
-                                 Size="ButtonSize.Small"
-                                 Click="@(() => SaveRow(formato))" />
-                    <RadzenButton Icon="close" 
-                                 ButtonStyle="ButtonStyle.Light"
-                                 Variant="Variant.Flat"
-                                 Size="ButtonSize.Small"
-                                 Click="@(() => CancelEdit(formato))" />
-                </EditTemplate>
-            </RadzenDataGridColumn>
-
-            <RadzenDataGridColumn TItem="W290_Formatos" Width="70px" Sortable="false" Filterable="false">
-                <Template Context="formato">
-                    @if (formato.Status)
-                    {
-                        <RadzenButton Icon="remove_circle"
-                                     ButtonStyle="ButtonStyle.Danger"
-                                     Variant="Variant.Flat"
-                                     Size="ButtonSize.Small"
-                                     Click="@(() => DesactivarFormato(formato))"
-                                     Disabled="@isLoading" />
-                    }
-                </Template>
             </RadzenDataGridColumn>
         </Columns>
     </RadzenDataGrid>
 </div>
 
 @code {
-    protected BadgeStyle GetEstadoBadgeStyle(int estado) => estado switch
+    protected Dictionary<int, string> estados = new()
     {
-        <= 0 => BadgeStyle.Danger,
-        < 5 => BadgeStyle.Warning,
-        5 => BadgeStyle.Success,
-        _ => BadgeStyle.Info
+        { 0, "Inactivo" },
+        { 1, "Pendiente" },
+        { 5, "Activo" }
     };
 
-    protected string GetEstadoText(int estado) => estado switch
+    protected async Task LoadData()
     {
-        <= 0 => "Inactivo",
-        < 5 => "Pendiente",
-        5 => "Activo",
-        _ => "Especial"
-    };
+        if (isLoading) return;
+        
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+            
+            var result = await RepoFormatos.Get(
+                orgId: CurrentUser.OrgId,
+                elUser: CurrentUser,
+                byPassCache: bypassCache,
+                cancellationToken: _ctsOperations.Token
+            );
+
+            if (result.Exito)
+            {
+                formatos = result.DataVarios;
+                count = formatos?.Count() ?? 0;
+                await LoadOrganizaciones();
+            }
+            else
+            {
+                errorMessage = result.Texto;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            await RepoBitacora.AddLog(
+                userId: CurrentUser?.Id ?? "Sistema",
+                orgId: CurrentUser?.OrgId ?? "Sistema",
+                desc: "Operación de carga de formatos cancelada por timeout",
+                tipoLog: "Warning",
+                origen: "FormatosBase.LoadData",
+                cancellationToken: _ctsBitacora.Token
+            );
+        }
+        catch (Exception ex)
+        {
+            await LogError(ex, "LoadData");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    protected async Task LoadOrganizaciones()
+    {
+        if (formatos == null) return;
+
+        foreach (var formato in formatos)
+        {
+            var orgs = await GetOrganizacionesFormato(formato.FormatoId);
+            formatoOrgs[formato.FormatoId] = orgs.ToList();
+        }
+    }
+
+    protected async Task<IEnumerable<W100_Org>> GetOrganizacionesFormato(string formatoId)
+    {
+        var result = await RepoFormatoGpo.Get(
+            orgId: CurrentUser.OrgId,
+            elUser: CurrentUser,
+            filtro: f => f.FormatoId == formatoId && f.Status,
+            byPassCache: bypassCache,
+            cancellationToken: _ctsOperations.Token
+        );
+
+        if (!result.Exito) return new List<W100_Org>();
+
+        var orgIds = result.DataVarios.Select(fg => fg.OrgId);
+        var orgsResult = await RepoOrg.Get(
+            orgId: CurrentUser.OrgId,
+            elUser: CurrentUser,
+            filtro: o => orgIds.Contains(o.OrgId),
+            byPassCache: bypassCache,
+            cancellationToken: _ctsOperations.Token
+        );
+
+        return orgsResult.Exito ? orgsResult.DataVarios : new List<W100_Org>();
+    }
+
+    protected void ShowOrganizaciones(W290_Formatos formato)
+    {
+        NavigationManager.NavigateTo($"/Configuracion/FormatosGpo/{formato.FormatoId}");
+    }
+
+    protected void Reset(W290_Formatos formato)
+    {
+        formatosToInsert.Remove(formato);
+        formatosToUpdate.Remove(formato);
+    }
+
+    protected void Reset()
+    {
+        formatosToInsert.Clear();
+        formatosToUpdate.Clear();
+    }
+
+    protected async Task EditRow(W290_Formatos formato)
+    {
+        isEditing = true;
+        if (gridFormatos?.EditMode == DataGridEditMode.Single)
+        {
+            Reset();
+        }
+        formatosToUpdate.Add(formato);
+        await gridFormatos.EditRow(formato);
+    }
+
+    protected async Task SaveRow(W290_Formatos formato)
+    {
+        try
+        {
+            await gridFormatos.UpdateRow(formato);
+            var result = await RepoFormatos.Update(
+                formato,
+                CurrentUser.OrgId,
+                CurrentUser,
+                cancellationToken: _ctsOperations.Token
+            );
+
+            if (!result.Exito)
+            {
+                throw new Exception(result.Texto);
+            }
+
+            await RepoBitacora.AddBitacora(
+                userId: CurrentUser.Id,
+                desc: $"Se actualizó el formato {formato.FormatoNombre}",
+                orgId: CurrentUser.OrgId,
+                cancellationToken: _ctsBitacora.Token
+            );
+
+            await LoadData();
+            isEditing = false;
+        }
+        catch (Exception ex)
+        {
+            await LogError(ex, "SaveRow");
+        }
+    }
+
+    protected void CancelEdit(W290_Formatos formato)
+    {
+        Reset(formato);
+        gridFormatos.CancelEditRow(formato);
+        isEditing = false;
+    }
+
+    protected async Task OnUpdateRow(W290_Formatos formato)
+    {
+        try
+        {
+            Reset(formato);
+            var result = await RepoFormatos.Update(
+                formato,
+                CurrentUser.OrgId,
+                CurrentUser,
+                cancellationToken: _ctsOperations.Token
+            );
+
+            if (!result.Exito)
+            {
+                throw new Exception(result.Texto);
+            }
+
+            await RepoBitacora.AddBitacora(
+                userId: CurrentUser.Id,
+                desc: $"Se actualizó el formato {formato.FormatoNombre}",
+                orgId: CurrentUser.OrgId,
+                cancellationToken: _ctsBitacora.Token
+            );
+
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            await LogError(ex, "OnUpdateRow");
+            if (gridFormatos != null)
+            {
+                await gridFormatos.Reload();
+            }
+            throw;
+        }
+    }
+
+    protected async Task InsertRow()
+    {
+        var nuevoFormato = new W290_Formatos(
+            formatoNombre: "Nuevo Formato",
+            descripcion: "Nuevo formato de documento",
+            orgId: CurrentUser.OrgId,
+            global: false,
+            estado: 5,
+            status: true
+        );
+
+        await gridFormatos.InsertRow(nuevoFormato);
+    }
+
+    protected async Task RefreshData()
+    {
+        if (isRefreshing) return;
+        
+        try 
+        {   
+            isRefreshing = true;
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            await LogError(ex, "RefreshData");
+        }
+        finally
+        {
+            isRefreshing = false;
+            StateHasChanged();
+        }
+    }
+
+    protected void ToggleBypassCache()
+    {
+        bypassCache = !bypassCache;
+        LoadData();
+    }
+
+    protected async Task LogError(Exception ex, string origen)
+    {
+        errorMessage = ex.Message;
+        await RepoBitacora.AddLog(
+            userId: CurrentUser.Id,
+            desc: $"Error en {origen}: {ex.Message}",
+            tipoLog: "Error",
+            origen: $"FormatosBase.{origen}",
+            orgId: CurrentUser.OrgId,
+            cancellationToken: _ctsLogs.Token
+        );
+    }
 } 

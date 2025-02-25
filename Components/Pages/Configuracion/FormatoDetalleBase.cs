@@ -23,6 +23,9 @@ public class FormatoDetalleBase : ComponentBase, IDisposable
     protected string? errorMessage;
     protected int count;
 
+    protected List<W292_FormatoDet> formatoDetallesToInsert = new();
+    protected List<W292_FormatoDet> formatoDetallesToUpdate = new();
+
     protected readonly List<string> tiposCampo = new()
     {
         "texto",
@@ -30,7 +33,7 @@ public class FormatoDetalleBase : ComponentBase, IDisposable
         "lista"
     };
 
-    private readonly CancellationTokenSource _ctsOperations = new(TimeSpan.FromSeconds(30));
+    protected readonly CancellationTokenSource _ctsOperations = new(TimeSpan.FromSeconds(30));
 
     protected override async Task OnInitializedAsync()
     {
@@ -92,101 +95,7 @@ public class FormatoDetalleBase : ComponentBase, IDisposable
         }
     }
 
-    protected async Task OnCreateRow(W292_FormatoDet detalle)
-    {
-        try
-        {
-            var result = await RepoFormatoDet.Insert(
-                detalle,
-                CurrentUser.OrgId,
-                CurrentUser,
-                _ctsOperations.Token
-            );
-
-            if (!result.Exito)
-            {
-                throw new Exception(result.Texto);
-            }
-
-            await RepoBitacora.AddBitacora(
-                userId: CurrentUser.Id,
-                desc: $"Campo agregado al formato: {detalle.Campo}",
-                orgId: CurrentUser.OrgId,
-                cancellationToken: _ctsOperations.Token
-            );
-
-            await LoadData();
-        }
-        catch (Exception ex)
-        {
-            await LogError(ex, "OnCreateRow");
-            throw;
-        }
-    }
-
-    protected async Task OnUpdateRow(W292_FormatoDet detalle)
-    {
-        try
-        {
-            var result = await RepoFormatoDet.Update(
-                detalle,
-                CurrentUser.OrgId,
-                CurrentUser,
-                _ctsOperations.Token
-            );
-
-            if (!result.Exito)
-            {
-                throw new Exception(result.Texto);
-            }
-
-            await RepoBitacora.AddBitacora(
-                userId: CurrentUser.Id,
-                desc: $"Campo actualizado: {detalle.Campo}",
-                orgId: CurrentUser.OrgId,
-                cancellationToken: _ctsOperations.Token
-            );
-        }
-        catch (Exception ex)
-        {
-            await LogError(ex, "OnUpdateRow");
-            throw;
-        }
-    }
-
-    protected async Task InsertRow()
-    {
-        try
-        {
-            var maxOrden = formatoDetalles?.Max(d => d.Orden) ?? 0;
-            var detalle = new W292_FormatoDet(
-                formatoId: FormatoId,
-                orden: maxOrden + 1,
-                tipo: "texto",
-                campo: "",
-                descripcion: "",
-                estado: 5,
-                status: true,
-                fechaCaptura: DateTime.Now
-            );
-
-            await gridFormatoDet.InsertRow(detalle);
-        }
-        catch (Exception ex)
-        {
-            await LogError(ex, "InsertRow");
-        }
-    }
-
-    protected void SaveRow(W292_FormatoDet detalle)
-    {
-        gridFormatoDet.UpdateRow(detalle);
-    }
-
-    protected void CancelEdit(W292_FormatoDet detalle)
-    {
-        gridFormatoDet.CancelEditRow(detalle);
-    }
+    
 
     protected async Task LogError(Exception ex, string origen)
     {

@@ -1,21 +1,56 @@
 @using Radzen.Blazor
 @using Radzen
 @inherits BitacoraListBase
+@rendermode InteractiveServer
+
+<PageTitle>Bitácora</PageTitle>
 
 <div class="container-fluid">
-    <div class="row mb-3 bg-light p-3 rounded">
+    @if (isLoading)
+    {
+        <div class="row">
+            <div class="col">
+                <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+            </div>
+        </div>
+    }
+
+    <div class="row mb-3">
         <div class="col-md-6">
             <h3>Bitácora</h3>
         </div>
         <div class="col-md-6 text-end">
-            <RadzenButton Click="@(() => gridBitacora.Reload())"
+            <RadzenButton Click="@RefreshData"
                          Icon="refresh"
-                         ButtonStyle="ButtonStyle.Light"
+                         ButtonStyle="@(isRefreshing ? ButtonStyle.Light : ButtonStyle.Primary)"
+                         Variant="Variant.Filled"
+                         Disabled="@isRefreshing"
                          class="me-2">
-                Refrescar
+                @(isRefreshing ? "Actualizando..." : "Refrescar")
             </RadzenButton>
+            @if (CurrentUser.Nivel >= 5)
+            {
+                <RadzenButton Click="@ToggleBypassCache"
+                            Text="@(bypassCache ? "Lectura" : "Forzar Lectura")"  
+                            ButtonStyle="ButtonStyle.Light"
+                            Variant="Variant.Outlined"
+                            class="me-2"
+                            Disabled="@isRefreshing">
+                </RadzenButton>
+            }
         </div>
     </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="row mb-3">
+            <div class="col">
+                <RadzenAlert AlertStyle="AlertStyle.Danger" ShowIcon="true" Variant="Variant.Flat" Shade="Shade.Lighter">
+                    @errorMessage
+                </RadzenAlert>
+            </div>
+        </div>
+    }
 
     <RadzenAccordion>
         <Items>
@@ -67,11 +102,20 @@
                     </div>
                     <div class="col-md-8 mb-3">
                         <RadzenFormField Text="Rango de Fechas" Style="width: 100%;">
-                            <RadzenDateRangePicker TValue="DateRange"
-                                                 Value="@(new DateRange { Start = fechaInicio ?? DateTime.Today, End = fechaFin ?? DateTime.Today })"
-                                                 Change="@OnRangoFechasChanged"
-                                                 DateFormat="dd/MM/yyyy"
-                                                 Style="width: 100%" />
+                            <div class="d-flex">
+                                <RadzenDatePicker TValue="DateTime?"
+                                                @bind-Value="@fechaInicio"
+                                                DateFormat="dd/MM/yyyy"
+                                                Style="width: 100%; margin-right: 8px;"
+                                                ShowTime="false"
+                                                Placeholder="Fecha inicio" />
+                                <RadzenDatePicker TValue="DateTime?"
+                                                @bind-Value="@fechaFin"
+                                                DateFormat="dd/MM/yyyy"
+                                                Style="width: 100%"
+                                                ShowTime="false"
+                                                Placeholder="Fecha fin" />
+                            </div>
                         </RadzenFormField>
                     </div>
                 </div>
@@ -79,12 +123,8 @@
         </Items>
     </RadzenAccordion>
 
-    @if (!string.IsNullOrEmpty(errorMessage))
-    {
-        <div class="alert alert-danger mt-3">@errorMessage</div>
-    }
-
     <RadzenDataGrid @ref="gridBitacora"
+                   TItem="Z900_Bitacora"
                    Data="@bitacoras"
                    Count="@count"
                    LoadData="@LoadPage"

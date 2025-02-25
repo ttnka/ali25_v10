@@ -13,7 +13,6 @@ public class Z900_Bitacora
     public string BitacoraId { get; set; } = MyFunc.MyGuid("Bit");
     public DateTime Fecha { get; set; } = DateTime.Now;
     [StringLength(65)]
-    
     public string UserId { get; set; } = "";
     public string Desc { get; set; } = "";
     [StringLength(65)]
@@ -24,8 +23,8 @@ public class Z900_Bitacora
         Desc = desc;
         OrgId = orgId;
     }
-    public virtual W100_Org Org { get; set; } = default!;
-    public virtual ApplicationUser User { get; set; } = default!;
+    
+   
 
     
 }

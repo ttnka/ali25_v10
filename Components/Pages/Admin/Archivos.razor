@@ -21,11 +21,23 @@
                                 onclick="document.getElementById('fileInput').click();">
                         Subir Archivo
                     </RadzenButton>
-                    <RadzenButton Click="@(() => gridFiles.Reload())"
+                    <RadzenButton Click="@RefreshData"
                                 Icon="refresh"
-                                ButtonStyle="ButtonStyle.Light">
-                        Refrescar
+                                ButtonStyle="@(isRefreshing ? ButtonStyle.Light : ButtonStyle.Primary)"
+                                Disabled="@isRefreshing"
+                                class="me-2">
+                        @(isRefreshing ? "Actualizando..." : "Refrescar")
                     </RadzenButton>
+                    @if (CurrentUser.Nivel >= 5)
+                    {
+                        <RadzenButton Click="@ToggleBypassCache"
+                                    Text="@(bypassCache ? "Lectura" : "Forzar Lectura")"  
+                                    ButtonStyle="ButtonStyle.Light"
+                                    Variant="Variant.Outlined"
+                                    class="me-2"
+                                    Disabled="@isRefreshing">
+                        </RadzenButton>
+                    }
                 </div>
             </div>
         </div>
@@ -33,17 +45,27 @@
 
     @if (!string.IsNullOrEmpty(errorMessage))
     {
-        <div class="alert alert-danger">@errorMessage</div>
+        <div class="row mb-3">
+            <div class="col">
+                <RadzenAlert AlertStyle="AlertStyle.Danger" ShowIcon="true" Variant="Variant.Flat" Shade="Shade.Lighter">
+                    @errorMessage
+                </RadzenAlert>
+            </div>
+        </div>
     }
 
     @if (isLoading)
     {
-        <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        <div class="row">
+            <div class="col">
+                <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+            </div>
+        </div>
     }
     else
     {
         <RadzenDataGrid @ref="gridFiles"
-                       Data="@files"
+                       Data="@archivos"
                        Count="@count"
                        AllowFiltering="true"
                        AllowColumnResize="true"
@@ -52,13 +74,17 @@
                        AllowSorting="true"
                        PageSize="10"
                        AllowPaging="true"
+                       EditMode="DataGridEditMode.Single"
                        PagerHorizontalAlign="HorizontalAlign.Left"
                        ShowPagingSummary="true"
                        class="rz-shadow-3">
             <Columns>
                 <RadzenDataGridColumn TItem="W180_Files" Property="Fecha" Title="Fecha" Width="150px">
                     <Template Context="file">
-                        @file.Fecha.ToString("dd/MMM/yyyy HH:mm")
+                        <div class="d-flex flex-column">
+                            <span>@file.Fecha.ToString("dd/MMM/yy")</span>
+                            <small class="text-muted">@file.Fecha.ToString("HH:mm:ss")</small>
+                        </div>
                     </Template>
                 </RadzenDataGridColumn>
 
@@ -82,9 +108,46 @@
                         <RadzenBadge BadgeStyle="@GetEstadoBadgeStyle(file.Estado)" 
                                     Text="@GetEstadoText(file.Estado)" />
                     </Template>
+                    <EditTemplate Context="file">
+                        <RadzenNumeric @bind-Value="file.Estado" Style="width: 100%" />
+                    </EditTemplate>
                 </RadzenDataGridColumn>
 
-                
+                <RadzenDataGridColumn TItem="W180_Files" Context="file" 
+                                    Filterable="false" 
+                                    Sortable="false" 
+                                    TextAlign="TextAlign.Center" 
+                                    Width="160px">
+                    <Template Context="file">
+                        <RadzenButton Click="@(() => EditRow(file))" 
+                                    Icon="edit" 
+                                    ButtonStyle="ButtonStyle.Light" 
+                                    Variant="Variant.Flat" 
+                                    Size="ButtonSize.Medium"
+                                    class="me-1"
+                                    Disabled="@(filesToUpdate.Contains(file))" />
+                        <RadzenButton Click="@(() => DeleteRow(file))" 
+                                    Icon="delete" 
+                                    ButtonStyle="ButtonStyle.Danger" 
+                                    Variant="Variant.Flat" 
+                                    Size="ButtonSize.Medium"
+                                    class="ms-1" />
+                    </Template>
+                    <EditTemplate Context="file">
+                        <RadzenButton Icon="check" 
+                                    ButtonStyle="ButtonStyle.Success" 
+                                    Variant="Variant.Flat" 
+                                    Size="ButtonSize.Medium"
+                                    class="me-1"
+                                    Click="@(() => SaveRow(file))" />
+                        <RadzenButton Icon="close" 
+                                    ButtonStyle="ButtonStyle.Light" 
+                                    Variant="Variant.Flat" 
+                                    Size="ButtonSize.Medium"
+                                    class="ms-1"
+                                    Click="@(() => CancelEdit(file))" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
             </Columns>
         </RadzenDataGrid>
     }
@@ -132,5 +195,63 @@
         _ => BadgeStyle.Info
     };
 
-    
+    protected void Reset(W180_Files file)
+    {
+        filesToInsert.Remove(file);
+        filesToUpdate.Remove(file);
+    }
+
+    protected void Reset()
+    {
+        filesToInsert.Clear();
+        filesToUpdate.Clear();
+    }
+
+    protected async Task EditRow(W180_Files file)
+    {
+        if (gridFiles?.EditMode == DataGridEditMode.Single)
+        {
+            Reset();
+        }
+        filesToUpdate.Add(file);
+        await gridFiles.EditRow(file);
+    }
+
+    protected async Task SaveRow(W180_Files file)
+    {
+        await gridFiles.UpdateRow(file);
+    }
+
+    protected void CancelEdit(W180_Files file)
+    {
+        Reset(file);
+        gridFiles.CancelEditRow(file);
+    }
+
+    protected async Task DeleteRow(W180_Files file)
+    {
+        try 
+        {
+            Reset(file);
+            if (archivos?.Contains(file) == true)
+            {
+                file.Status = false;
+                var result = await RepoFiles.Update(file, CurrentUser.OrgId, elUser: CurrentUser, cancellationToken: _ctsOperations.Token);
+                if (!result.Exito)
+                {
+                    throw new Exception(result.Texto);
+                }
+                await gridFiles.Reload();
+            }
+            else
+            {
+                gridFiles.CancelEditRow(file);
+                await gridFiles.Reload();
+            }
+        }
+        catch (Exception ex)
+        {
+            await LogError(ex, "DeleteRow");
+        }
+    }
 } 

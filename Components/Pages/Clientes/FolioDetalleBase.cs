@@ -1,39 +1,50 @@
-using Ali25_V10.Data;
-using Ali25_V10.Data.Modelos;
-using Ali25_V10.Data.Sistema;
 using Microsoft.AspNetCore.Components;
 using Radzen;
 using Radzen.Blazor;
+using Ali25_V10.Data;
+using Ali25_V10.Data.Modelos;
+using Ali25_V10.Data.Sistema;
 
 namespace Ali25_V10.Components.Pages.Clientes;
 
 public class FolioDetalleBase : ComponentBase, IDisposable
 {
-    [Parameter] public string FolioId { get; set; } = string.Empty;
     [CascadingParameter] protected ApplicationUser CurrentUser { get; set; } = default!;
+    [Parameter] public string FolioId { get; set; } = string.Empty;
     [Inject] protected IRepo<W220_Folios> RepoFolios { get; set; } = default!;
     [Inject] protected IRepo<W222_FolioDet> RepoFolioDet { get; set; } = default!;
-    [Inject] protected IRepo<W292_FormatoDet> RepoFormatoDet { get; set; } = default!;
     [Inject] protected IRepoBitacora RepoBitacora { get; set; } = default!;
     [Inject] protected NavigationManager NavigationManager { get; set; } = default!;
 
     protected RadzenDataGrid<W222_FolioDet> gridFolioDet = default!;
-    protected IEnumerable<W222_FolioDet>? folioDetalles;
-    protected Dictionary<string, W292_FormatoDet> formatoDetalles = new();
     protected W220_Folios? folio;
-    protected bool isLoading;
-    protected string? errorMessage;
+    protected IEnumerable<W222_FolioDet>? detalles;
+    protected List<W222_FolioDet> detallesToInsert = new();
+    protected List<W222_FolioDet> detallesToUpdate = new();
     protected int count;
+    protected DataGridEditMode editMode = DataGridEditMode.Single;
 
-    private readonly CancellationTokenSource _ctsOperations = new(TimeSpan.FromSeconds(30));
+    protected bool isLoading;
+    protected bool isRefreshing;
+    protected bool isEditing;
+    protected bool bypassCache;
+    protected string? errorMessage;
+
+    protected readonly CancellationTokenSource _ctsOperations = new(TimeSpan.FromSeconds(30));
+    protected readonly CancellationTokenSource _ctsBitacora = new(TimeSpan.FromSeconds(5));
+    protected readonly CancellationTokenSource _ctsLogs = new(TimeSpan.FromSeconds(5));
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            await LoadFolio();
-            await LoadFormatoDetalles();
             await LoadData();
+            await RepoBitacora.AddBitacora(
+                userId: CurrentUser.Id,
+                desc: $"Accediendo al detalle del folio {FolioId}",
+                orgId: CurrentUser.OrgId,
+                cancellationToken: _ctsBitacora.Token
+            );
         }
         catch (Exception ex)
         {
@@ -41,58 +52,51 @@ public class FolioDetalleBase : ComponentBase, IDisposable
         }
     }
 
-    protected async Task LoadFolio()
-    {
-        var result = await RepoFolios.Get(
-            orgId: CurrentUser.OrgId,
-            elUser: CurrentUser,
-            filtro: f => f.FolioId == FolioId,
-            cancellationToken: _ctsOperations.Token
-        );
-
-        if (!result.Exito || !result.DataVarios.Any())
-        {
-            NavigationManager.NavigateTo("/Clientes/Folios");
-            return;
-        }
-
-        folio = result.DataVarios.First();
-    }
-
-    protected async Task LoadFormatoDetalles()
-    {
-        if (folio == null) return;
-
-        var result = await RepoFormatoDet.Get(
-            orgId: CurrentUser.OrgId,
-            elUser: CurrentUser,
-            filtro: f => f.FormatoId == folio.FormatoId && f.Status,
-            cancellationToken: _ctsOperations.Token
-        );
-
-        if (result.Exito)
-        {
-            formatoDetalles = result.DataVarios.ToDictionary(d => d.Campo);
-        }
-    }
-
     protected async Task LoadData()
     {
+        if (isLoading) return;
+        
         try
         {
             isLoading = true;
-            var result = await RepoFolioDet.Get(
+
+            var folioResult = await RepoFolios.GetById(
+                FolioId,
+                CurrentUser.OrgId,
+                CurrentUser,
+                bypassCache,
+                _ctsOperations.Token
+            );
+
+            if (folioResult.Exito)
+            {
+                folio = folioResult.DataUno;
+            }
+
+            var detallesResult = await RepoFolioDet.Get(
                 orgId: CurrentUser.OrgId,
                 elUser: CurrentUser,
-                filtro: f => f.FolioId == FolioId && f.Status,
+                filtro: d => d.FolioId == FolioId,
+                byPassCache: bypassCache,
                 cancellationToken: _ctsOperations.Token
             );
 
-            if (result.Exito)
+            if (detallesResult.Exito)
             {
-                folioDetalles = result.DataVarios;
-                count = folioDetalles?.Count() ?? 0;
+                detalles = detallesResult.DataVarios;
+                count = detalles?.Count() ?? 0;
             }
+        }
+        catch (OperationCanceledException)
+        {
+            await RepoBitacora.AddLog(
+                userId: CurrentUser?.Id ?? "Sistema",
+                orgId: CurrentUser?.OrgId ?? "Sistema",
+                desc: "Operación de carga de detalles cancelada por timeout",
+                tipoLog: "Warning",
+                origen: "FolioDetalleBase.LoadData",
+                cancellationToken: _ctsBitacora.Token
+            );
         }
         catch (Exception ex)
         {
@@ -105,94 +109,49 @@ public class FolioDetalleBase : ComponentBase, IDisposable
         }
     }
 
-    protected async Task OnUpdateRow(W222_FolioDet detalle)
+    protected async Task RefreshData()
     {
-        try
-        {
-            // Validar el valor según el tipo de campo
-            if (formatoDetalles.TryGetValue(detalle.Campo, out var formatoDet))
-            {
-                ValidarValor(detalle.Valor, formatoDet.Tipo);
-            }
-
-            var result = await RepoFolioDet.Update(
-                detalle,
-                CurrentUser.OrgId,
-                CurrentUser,
-                _ctsOperations.Token
-            );
-
-            if (!result.Exito)
-            {
-                throw new Exception(result.Texto);
-            }
-
-            await RepoBitacora.AddBitacora(
-                userId: CurrentUser.Id,
-                desc: $"Campo actualizado: {detalle.Campo} = {detalle.Valor}",
-                orgId: CurrentUser.OrgId,
-                cancellationToken: _ctsOperations.Token
-            );
+        if (isRefreshing) return;
+        
+        try 
+        {   
+            isRefreshing = true;
+            await LoadData();
         }
         catch (Exception ex)
         {
-            await LogError(ex, "OnUpdateRow");
-            throw;
+            await LogError(ex, "RefreshData");
         }
-    }
-
-    protected void ValidarValor(string valor, string tipo)
-    {
-        switch (tipo.ToLower())
+        finally
         {
-            case "decimal":
-                if (!decimal.TryParse(valor, out _))
-                {
-                    throw new Exception("El valor debe ser un número decimal válido");
-                }
-                break;
-            case "lista":
-                // Aquí podrías validar que el valor esté en una lista permitida
-                break;
-            // Para "texto" no necesitamos validación especial
+            isRefreshing = false;
+            StateHasChanged();
         }
     }
 
-    protected string GetTipoCampo(string campo)
+    protected void ToggleBypassCache()
     {
-        return formatoDetalles.TryGetValue(campo, out var detalle) ? detalle.Tipo : "texto";
-    }
-
-    protected void EditRow(W222_FolioDet detalle)
-    {
-        gridFolioDet.EditRow(detalle);
-    }
-
-    protected void SaveRow(W222_FolioDet detalle)
-    {
-        gridFolioDet.UpdateRow(detalle);
-    }
-
-    protected void CancelEdit(W222_FolioDet detalle)
-    {
-        gridFolioDet.CancelEditRow(detalle);
+        bypassCache = !bypassCache;
+        LoadData();
     }
 
     protected async Task LogError(Exception ex, string origen)
     {
         errorMessage = ex.Message;
         await RepoBitacora.AddLog(
+            userId: CurrentUser.Id,
             desc: $"Error en {origen}: {ex.Message}",
             tipoLog: "Error",
             origen: $"FolioDetalleBase.{origen}",
-            userId: CurrentUser.Id,
             orgId: CurrentUser.OrgId,
-            cancellationToken: _ctsOperations.Token
+            cancellationToken: _ctsLogs.Token
         );
     }
 
     public void Dispose()
     {
         _ctsOperations.Dispose();
+        _ctsBitacora.Dispose();
+        _ctsLogs.Dispose();
     }
 } 

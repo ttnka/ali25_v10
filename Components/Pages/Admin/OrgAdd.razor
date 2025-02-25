@@ -2,7 +2,29 @@
 @inherits OrgAddBase
 @rendermode InteractiveServer
 
-<div class="p-3 bg-light rounded">
+<PageTitle>Nueva Organización</PageTitle>
+
+<div class="container-fluid">
+    @if (isLoading)
+    {
+        <div class="row">
+            <div class="col">
+                <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+            </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="row mb-3">
+            <div class="col">
+                <RadzenAlert AlertStyle="AlertStyle.Danger" ShowIcon="true" Variant="Variant.Flat" Shade="Shade.Lighter">
+                    @errorMessage
+                </RadzenAlert>
+            </div>
+        </div>
+    }
+
     <RadzenTemplateForm TItem="W100_Org" Data=@newOrg Submit=@SaveOrg>
         <DataAnnotationsValidator />
 
@@ -55,8 +77,6 @@
                     </div>
                 </RadzenFormField>
             </div>
-
-            
         </div>
 
         <div class="row">
@@ -84,7 +104,6 @@
         </div>
 
         <h4 class="mt-4">Datos del Administrador</h4>
-        
 
         <div class="row">
             <div class="col-md-4 mb-3">
@@ -134,7 +153,9 @@
                     </div>
                 </RadzenFormField>
             </div>
+        </div>
 
+        <div class="row">
             <div class="col-md-8 mb-3">
                 <RadzenFormField Text="Email" Style="width: 100%;">
                     <RadzenTextBox @bind-Value="@adminEmail" 
@@ -163,48 +184,47 @@
                 <div class="col-md-6 mb-3">
                     <RadzenFormField Text="Contraseña" Style="width: 100%;">
                         <div class="input-group">
-                        <RadzenPassword @bind-Value="@adminPassword"
-                                      Style="width: 100%"
-                                      type=@(showPassword ? "text" : "password")
-                                      MaxLength="100" />
-                        <div class="input-group-append">
-                            <RadzenButton Click="@(() => showPassword = !showPassword)"
-                                        Icon="@(showPassword ? "visibility_off" : "visibility")"
-                                        ButtonStyle="ButtonStyle.Light"
-                                        class="h-100" />
+                            <RadzenPassword @bind-Value="@adminPassword"
+                                          Style="width: 100%"
+                                          type=@(showPassword ? "text" : "password")
+                                          MaxLength="100" />
+                            <div class="input-group-append">
+                                <RadzenButton Click="@(() => showPassword = !showPassword)"
+                                            Icon="@(showPassword ? "visibility_off" : "visibility")"
+                                            ButtonStyle="ButtonStyle.Light"
+                                            class="h-100" />
+                            </div>
                         </div>
-                    </div>
-                </RadzenFormField>
+                    </RadzenFormField>
                 </div>
             
                 <div class="col-md-6 mb-3">
-                <RadzenFormField Text="Confirmar Contraseña" Style="width: 100%;">
-                    <div class="input-group">
-                        <RadzenPassword @bind-Value="@adminConfirmPassword"
-                                      Style="width: 100%"
-                                      type=@(showConfirmPassword ? "text" : "password")
-                                      MaxLength="100" />
-                        <div class="input-group-append">
-                            <RadzenButton Click="@(() => showConfirmPassword = !showConfirmPassword)"
-                                        Icon="@(showConfirmPassword ? "visibility_off" : "visibility")"
-                                        ButtonStyle="ButtonStyle.Light"
-                                        class="h-100" />
+                    <RadzenFormField Text="Confirmar Contraseña" Style="width: 100%;">
+                        <div class="input-group">
+                            <RadzenPassword @bind-Value="@adminConfirmPassword"
+                                          Style="width: 100%"
+                                          type=@(showConfirmPassword ? "text" : "password")
+                                          MaxLength="100" />
+                            <div class="input-group-append">
+                                <RadzenButton Click="@(() => showConfirmPassword = !showConfirmPassword)"
+                                            Icon="@(showConfirmPassword ? "visibility_off" : "visibility")"
+                                            ButtonStyle="ButtonStyle.Light"
+                                            class="h-100" />
+                            </div>
                         </div>
-                    </div>
-                    @if (adminPassword != adminConfirmPassword)
-                    {
-                        <div class="text-danger">
-                            <small>Las contraseñas no coinciden</small>
-                        </div>
-                    }
-                </RadzenFormField>
+                        @if (adminPassword != adminConfirmPassword)
+                        {
+                            <div class="text-danger">
+                                <small>Las contraseñas no coinciden</small>
+                            </div>
+                        }
+                    </RadzenFormField>
                 </div>
             }
             else
             {
                 <div class="col-md-6 mb-3">
                     <RadzenLabel Style="width: 100%" Text="Contraseña temporal: RFC" />
-                    
                 </div>
             }
         </div>
@@ -215,11 +235,11 @@
                 <div class="col-md-6 mb-3">
                     <RadzenFormField Text="Nivel" Style="width: 100%;">
                         <RadzenDropDown TValue="int"
-                                        @bind-Value="@nivelSeleccionado"
-                                       Data="@niveles"
-                                       ValueProperty="Key"
-                                       TextProperty="Value"
-                                       Style="width: 100%" />
+                                      @bind-Value="@nivelSeleccionado"
+                                      Data="@niveles"
+                                      ValueProperty="Key"
+                                      TextProperty="Value"
+                                      Style="width: 100%" />
                     </RadzenFormField>
                 </div>
                 <div class="col-md-6 mb-3">
@@ -229,27 +249,22 @@
                 </div>
             </div>
         }
-            <div class="row">
-                
-                
-            </div>
-
-        @if (!string.IsNullOrEmpty(errorMessage))
-        {
-            <div class="alert alert-danger">@errorMessage</div>
-        }
 
         <div class="row mt-4">
             <div class="col-12">
                 <RadzenButton Click="@ResetForm" 
                              Text="Cancelar" 
                              ButtonStyle="ButtonStyle.Danger"
+                             Variant="Variant.Outlined"
                              class="me-2" />
                              
-                <RadzenButton Click="@SaveOrg" 
-                             Text="Guardar" 
+                <RadzenButton ButtonType="ButtonType.Submit"
+                             Icon="save"
+                             Text="Guardar"
                              ButtonStyle="ButtonStyle.Primary"
-                             Disabled="@(!IsFormValid() || isSaving)" />
+                             Variant="Variant.Filled"
+                             IsBusy="@isSaving"
+                             Disabled="@isSaving" />
             </div>
         </div>
     </RadzenTemplateForm>

@@ -1,0 +1,317 @@
+@inherits FolioConceptosBase
+@rendermode InteractiveServer
+
+<PageTitle>Conceptos de Folio</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h3>Conceptos de Folio</h3>
+                <div>
+                    <RadzenButton Click="@(() => NavigationManager.NavigateTo("/clientes/folios"))"
+                                Icon="arrow_back"
+                                ButtonStyle="ButtonStyle.Secondary"
+                                class="me-2">
+                        Regresar
+                    </RadzenButton>
+                    <RadzenButton Click="@InsertRow"
+                                Icon="add"
+                                ButtonStyle="ButtonStyle.Success"
+                                class="me-2"
+                                Disabled="@isLoading">
+                        Nuevo Concepto
+                    </RadzenButton>
+                    <RadzenButton Click="@RefreshData"
+                                Icon="refresh"
+                                ButtonStyle="ButtonStyle.Light"
+                                Disabled="@(isLoading || isRefreshing)">
+                        @(isRefreshing ? "Actualizando..." : "Refrescar")
+                    </RadzenButton>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @errorMessage
+            <button type="button" class="btn-close" @onclick="@(() => errorMessage = null)"></button>
+        </div>
+    }
+
+    @if (folio != null)
+    {
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Folio</h5>
+                        <p class="card-text">@folio.Folio</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Fecha</h5>
+                        <p class="card-text">@folio.FechaFolio.ToString("dd/MM/yyyy")</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Estado</h5>
+                        <span class="@(folio.Estado switch {
+                            <= 0 => "badge bg-danger",
+                            < 5 => "badge bg-warning",
+                            _ => "badge bg-success"
+                        })">
+                            @(folio.Estado switch {
+                                <= 0 => "Inactivo",
+                                < 5 => "Pendiente",
+                                _ => "Activo"
+                            })
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" @bind="bypassCache" id="bypassCache">
+                <label class="form-check-label" for="bypassCache">
+                    Forzar recarga de datos
+                </label>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        </div>
+    }
+
+    <RadzenDataGrid @ref="gridConceptos"
+                   Data="@conceptos"
+                   Count="@count"
+                   TItem="W221_Conceptos"
+                   AllowFiltering="true"
+                   AllowColumnResize="true"
+                   AllowAlternatingRows="false"
+                   FilterMode="FilterMode.Advanced"
+                   AllowSorting="true"
+                   PageSize="10"
+                   AllowPaging="true"
+                   PagerHorizontalAlign="HorizontalAlign.Left"
+                   ShowPagingSummary="true"
+                   EditMode="@editMode"
+                   LoadingIndicator="true"
+                   IsLoading="@isLoading"
+                   class="rz-shadow-3">
+        <Columns>
+            <RadzenDataGridColumn TItem="W221_Conceptos" Property="ProductoId" Title="Producto">
+                <Template Context="concepto">
+                    @(productos?.FirstOrDefault(p => p.ProductoId == concepto.ProductoId)?.Titulo ?? "")
+                </Template>
+                <EditTemplate Context="concepto">
+                    <RadzenDropDown @bind-Value="concepto.ProductoId"
+                                  Data="@productos"
+                                  TextProperty="Titulo"
+                                  ValueProperty="ProductoId"
+                                  Style="width:100%"
+                                  Name="Producto" />
+                    <RadzenRequiredValidator Component="Producto" Text="El producto es requerido" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="W221_Conceptos" Property="Cantidad" Title="Cantidad">
+                <Template Context="concepto">
+                    @concepto.Cantidad.ToString("N2")
+                </Template>
+                <EditTemplate Context="concepto">
+                    <RadzenNumeric @bind-Value="concepto.Cantidad" Format="N2" Style="width:100%" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="W221_Conceptos" Property="Precio" Title="Precio">
+                <Template Context="concepto">
+                    @concepto.Precio.ToString("C2")
+                </Template>
+                <EditTemplate Context="concepto">
+                    <RadzenNumeric @bind-Value="concepto.Precio" Format="C2" Style="width:100%" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="W221_Conceptos" Title="Total">
+                <Template Context="concepto">
+                    @((concepto.Cantidad * concepto.Precio).ToString("C2"))
+                </Template>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="W221_Conceptos" Property="Estado" Title="Estado" Width="100px">
+                <Template Context="concepto">
+                    <span class="badge @(concepto.Estado switch {
+                        <= 0 => "bg-danger",
+                        < 5 => "bg-warning",
+                        _ => "bg-success"
+                    })">
+                        @(concepto.Estado switch {
+                            <= 0 => "Inactivo",
+                            < 5 => "Pendiente",
+                            _ => "Activo"
+                        })
+                    </span>
+                </Template>
+                <EditTemplate Context="concepto">
+                    <RadzenDropDown @bind-Value="concepto.Estado" 
+                                  Data="@estados"
+                                  TextProperty="Value"
+                                  ValueProperty="Key"
+                                  Style="width:100%" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="W221_Conceptos" Width="70px" Sortable="false" Filterable="false">
+                <Template Context="concepto">
+                    <RadzenButton Icon="edit" 
+                                ButtonStyle="ButtonStyle.Light"
+                                Variant="Variant.Flat"
+                                Size="ButtonSize.Medium"
+                                Click="@(() => EditRow(concepto))"
+                                Disabled="@(isLoading || isEditing)" />
+                </Template>
+                <EditTemplate Context="concepto">
+                    <RadzenButton Icon="check" 
+                                ButtonStyle="ButtonStyle.Success"
+                                Variant="Variant.Flat"
+                                Size="ButtonSize.Small"
+                                Click="@(() => SaveRow(concepto))" />
+                    <RadzenButton Icon="close" 
+                                ButtonStyle="ButtonStyle.Light"
+                                Variant="Variant.Flat"
+                                Size="ButtonSize.Small"
+                                Click="@(() => CancelEdit(concepto))" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+</div>
+
+@code {
+    protected Dictionary<int, string> estados = new()
+    {
+        { 0, "Inactivo" },
+        { 1, "Pendiente" },
+        { 5, "Activo" }
+    };
+
+    protected void Reset(W221_Conceptos concepto)
+    {
+        conceptosToInsert.Remove(concepto);
+        conceptosToUpdate.Remove(concepto);
+    }
+
+    protected void Reset()
+    {
+        conceptosToInsert.Clear();
+        conceptosToUpdate.Clear();
+    }
+
+    protected async Task InsertRow()
+    {
+        if (gridConceptos?.EditMode == DataGridEditMode.Single)
+        {
+            Reset();
+        }
+
+        var concepto = new W221_Conceptos(
+            FolioId,
+            "",
+            0M,
+            0M,
+            5,
+            true
+        );
+        
+        conceptosToInsert.Add(concepto);
+        await gridConceptos.InsertRow(concepto);
+    }
+
+    protected async Task EditRow(W221_Conceptos concepto)
+    {
+        if (gridConceptos?.EditMode == DataGridEditMode.Single)
+        {
+            Reset();
+        }
+        conceptosToUpdate.Add(concepto);
+        await gridConceptos.EditRow(concepto);
+        isEditing = true;
+    }
+
+    protected async Task SaveRow(W221_Conceptos concepto)
+    {
+        try
+        {
+            if (conceptosToInsert.Contains(concepto))
+            {
+                var result = await RepoConceptos.Insert(concepto, CurrentUser.OrgId, CurrentUser, _ctsOperations.Token);
+                if (!result.Exito)
+                {
+                    throw new Exception(result.Texto);
+                }
+
+                await RepoBitacora.AddBitacora(
+                    userId: CurrentUser.Id,
+                    desc: $"Se creó el concepto para el folio {concepto.FolioId}",
+                    orgId: CurrentUser.OrgId,
+                    cancellationToken: _ctsBitacora.Token
+                );
+
+                conceptosToInsert.Remove(concepto);
+            }
+            else if (conceptosToUpdate.Contains(concepto))
+            {
+                var result = await RepoConceptos.Update(concepto, CurrentUser.OrgId, CurrentUser, _ctsOperations.Token);
+                if (!result.Exito)
+                {
+                    throw new Exception(result.Texto);
+                }
+
+                await RepoBitacora.AddBitacora(
+                    userId: CurrentUser.Id,
+                    desc: $"Se actualizó el concepto del folio {concepto.FolioId}",
+                    orgId: CurrentUser.OrgId,
+                    cancellationToken: _ctsBitacora.Token
+                );
+
+                conceptosToUpdate.Remove(concepto);
+            }
+
+            await gridConceptos.UpdateRow(concepto);
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            await LogError(ex, "SaveRow");
+        }
+        finally
+        {
+            isEditing = false;
+        }
+    }
+
+    protected void CancelEdit(W221_Conceptos concepto)
+    {
+        Reset(concepto);
+        gridConceptos.CancelEditRow(concepto);
+        isEditing = false;
+    }
+} 

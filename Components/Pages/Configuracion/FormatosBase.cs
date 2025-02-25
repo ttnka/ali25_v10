@@ -1,9 +1,9 @@
-using Ali25_V10.Data;
-using Ali25_V10.Data.Modelos;
-using Ali25_V10.Data.Sistema;
 using Microsoft.AspNetCore.Components;
 using Radzen;
 using Radzen.Blazor;
+using Ali25_V10.Data;
+using Ali25_V10.Data.Modelos;
+using Ali25_V10.Data.Sistema;
 
 namespace Ali25_V10.Components.Pages.Configuracion;
 
@@ -17,19 +17,42 @@ public class FormatosBase : ComponentBase, IDisposable
     [Inject] protected NavigationManager NavigationManager { get; set; } = default!;
 
     protected RadzenDataGrid<W290_Formatos> gridFormatos = default!;
+    protected int count;
     protected IEnumerable<W290_Formatos>? formatos;
     protected Dictionary<string, List<W100_Org>> formatoOrgs = new();
-    protected bool isLoading;
-    protected string? errorMessage;
-    protected int count;
+    protected List<W290_Formatos> formatosToInsert = new();
+    protected List<W290_Formatos> formatosToUpdate = new();
     
-    private readonly CancellationTokenSource _ctsOperations = new(TimeSpan.FromSeconds(30));
+    protected bool bypassCache { get; set; } = false;
+    protected DataGridEditMode editMode = DataGridEditMode.Single;
+    protected bool isLoading = false;
+    protected bool isRefreshing = false;
+    protected bool isEditing = false;
+
+    protected readonly CancellationTokenSource _ctsOperations = new(TimeSpan.FromSeconds(30));
+    protected readonly CancellationTokenSource _ctsBitacora = new(TimeSpan.FromSeconds(5));
+    protected readonly CancellationTokenSource _ctsLogs = new(TimeSpan.FromSeconds(5));
+
+    protected string? errorMessage;
+
+    public void Dispose()
+    {
+        _ctsOperations.Dispose();
+        _ctsBitacora.Dispose();
+        _ctsLogs.Dispose();
+    }
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
             await LoadData();
+            await RepoBitacora.AddBitacora(
+                userId: CurrentUser.Id,
+                desc: "Accediendo a lista de formatos",
+                orgId: CurrentUser.OrgId,
+                cancellationToken: _ctsBitacora.Token
+            );
         }
         catch (Exception ex)
         {
@@ -39,13 +62,17 @@ public class FormatosBase : ComponentBase, IDisposable
 
     protected async Task LoadData()
     {
+        if (isLoading) return;
+        
         try
         {
             isLoading = true;
+            errorMessage = null;
+            
             var result = await RepoFormatos.Get(
                 orgId: CurrentUser.OrgId,
                 elUser: CurrentUser,
-                filtro: f => f.Status,
+                byPassCache: bypassCache,
                 cancellationToken: _ctsOperations.Token
             );
 
@@ -55,6 +82,21 @@ public class FormatosBase : ComponentBase, IDisposable
                 count = formatos?.Count() ?? 0;
                 await LoadOrganizaciones();
             }
+            else
+            {
+                errorMessage = result.Texto;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            await RepoBitacora.AddLog(
+                userId: CurrentUser?.Id ?? "Sistema",
+                orgId: CurrentUser?.OrgId ?? "Sistema",
+                desc: "Operación de carga de formatos cancelada por timeout",
+                tipoLog: "Warning",
+                origen: "FormatosBase.LoadData",
+                cancellationToken: _ctsBitacora.Token
+            );
         }
         catch (Exception ex)
         {
@@ -84,6 +126,7 @@ public class FormatosBase : ComponentBase, IDisposable
             orgId: CurrentUser.OrgId,
             elUser: CurrentUser,
             filtro: f => f.FormatoId == formatoId && f.Status,
+            byPassCache: bypassCache,
             cancellationToken: _ctsOperations.Token
         );
 
@@ -94,6 +137,7 @@ public class FormatosBase : ComponentBase, IDisposable
             orgId: CurrentUser.OrgId,
             elUser: CurrentUser,
             filtro: o => orgIds.Contains(o.OrgId),
+            byPassCache: bypassCache,
             cancellationToken: _ctsOperations.Token
         );
 
@@ -109,140 +153,12 @@ public class FormatosBase : ComponentBase, IDisposable
     {
         errorMessage = ex.Message;
         await RepoBitacora.AddLog(
+            userId: CurrentUser.Id,
             desc: $"Error en {origen}: {ex.Message}",
             tipoLog: "Error",
             origen: $"FormatosBase.{origen}",
-            userId: CurrentUser.Id,
             orgId: CurrentUser.OrgId,
-            cancellationToken: _ctsOperations.Token
+            cancellationToken: _ctsLogs.Token
         );
-    }
-
-    protected async Task OnCreateRow()
-    {
-        try
-        {
-            var newFormato = new W290_Formatos(
-                formatoNombre: "Nuevo Formato",
-                descripcion: "",
-                orgId: CurrentUser.OrgId,
-                global: false,
-                estado: 5,
-                status: true
-            );
-
-            await gridFormatos.InsertRow(newFormato);
-        }
-        catch (Exception ex)
-        {
-            await LogError(ex, "OnCreateRow");
-        }
-    }
-
-    protected void SaveRow(W290_Formatos formato)
-    {
-        try
-        {
-             gridFormatos.UpdateRow(formato);
-        }
-        catch (Exception ex)
-        {
-            gridFormatos.CancelEditRow(formato);
-            throw;
-        }
-    }
-
-    protected void CancelEdit(W290_Formatos formato)
-    {
-        gridFormatos.CancelEditRow(formato);
-    }
-
-    protected async Task OnUpdateRow(W290_Formatos formato)
-    {
-        try 
-        {
-            var result = await RepoFormatos.Update(formato, CurrentUser.OrgId, CurrentUser, _ctsOperations.Token);
-            if (!result.Exito)
-            {
-                throw new Exception(result.Texto);
-            }
-
-            await RepoBitacora.AddBitacora(
-                userId: CurrentUser.Id,
-                desc: $"Formato actualizado: {formato.FormatoNombre}",
-                orgId: CurrentUser.OrgId,
-                cancellationToken: _ctsOperations.Token
-            );
-
-            await LoadData();
-        }
-        catch (Exception ex)
-        {
-            await LogError(ex, "OnUpdateRow");
-            throw;
-        }
-    }
-
-    protected async Task OnInsertRow(W290_Formatos formato)
-    {
-        try
-        {
-            var result = await RepoFormatos.Insert(formato, CurrentUser.OrgId, CurrentUser, _ctsOperations.Token);
-            if (!result.Exito)
-            {
-                throw new Exception(result.Texto);
-            }
-
-            await RepoBitacora.AddBitacora(
-                userId: CurrentUser.Id,
-                desc: $"Formato creado: {formato.FormatoNombre}",
-                orgId: CurrentUser.OrgId,
-                cancellationToken: _ctsOperations.Token
-            );
-
-            await LoadData();
-        }
-        catch (Exception ex)
-        {
-            await LogError(ex, "OnInsertRow");
-            throw;
-        }
-    }
-
-    protected async Task DesactivarFormato(W290_Formatos formato)
-    {
-        try
-        {
-            formato.Status = false;
-            var result = await RepoFormatos.Update(
-                formato,
-                CurrentUser.OrgId,
-                CurrentUser,
-                _ctsOperations.Token
-            );
-
-            if (!result.Exito)
-            {
-                throw new Exception(result.Texto);
-            }
-
-            await RepoBitacora.AddBitacora(
-                userId: CurrentUser.Id,
-                desc: $"Formato desactivado: {formato.FormatoNombre}",
-                orgId: CurrentUser.OrgId,
-                cancellationToken: _ctsOperations.Token
-            );
-
-            await LoadData();
-        }
-        catch (Exception ex)
-        {
-            await LogError(ex, "DesactivarFormato");
-        }
-    }
-
-    public void Dispose()
-    {
-        _ctsOperations.Dispose();
     }
 } 

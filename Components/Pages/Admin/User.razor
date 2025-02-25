@@ -4,22 +4,24 @@
 
 <PageTitle>Usuarios</PageTitle>
 
-@if (CurrentUser.Nivel >= 5) 
-{
-    <hr style="border: 1px solid black; margin: 20px 0;" />
-    <RadzenAccordion>
-        <Items>
-            <RadzenAccordionItem Text="Agregar Usuario" Icon="person_add"
-                               CollapseTitle="Cerrar formulario" 
-                               ExpandTitle="Agregar nuevo usuario">
-                
-            </RadzenAccordionItem>
-        </Items>
-    </RadzenAccordion>
-    <hr style="border: 1px solid black; margin: 20px 0;" />
-}
-
 <div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col">
+            <RadzenButton Click="RefreshData" 
+                         Text=@(isRefreshing ? "Actualizando..." : "Actualizar")
+                         ButtonStyle=@(isRefreshing ? ButtonStyle.Warning : ButtonStyle.Primary)
+                         Disabled=@isRefreshing />
+
+            @if (CurrentUser?.Nivel >= 5)
+            {
+                <RadzenButton Click="ToggleBypassCache"
+                             Text=@(bypassCache ? "Forzar Lectura" : "Lectura")
+                             ButtonStyle=@(bypassCache ? ButtonStyle.Warning : ButtonStyle.Info)
+                             class="mx-2" />
+            }
+        </div>
+    </div>
+
     <div class="row mb-3 bg-light p-3 rounded">
         <div class="col-md-4">
             <RadzenFormField Text="Tipo" Style="width: 100%;">
@@ -30,7 +32,7 @@
                                Change="@(async(args) => await OnFiltroSelected(args))" />
             </RadzenFormField>
         </div>
-        <div class="col-md-6">
+        <div class="col-md-8">
             <RadzenFormField Text="Organización" Style="width: 100%;">
                 <RadzenDropDown @bind-Value="@LaOrgId"
                                Data="@orgsFiltradas"
@@ -41,171 +43,131 @@
                                Placeholder="Seleccione una organización..." />
             </RadzenFormField>
         </div>
-        <div class="col-md-2 d-flex align-items-end">
-            <RadzenButton Click="@RefreshData" 
-                         Icon="refresh" 
-                         ButtonStyle="@(isRefreshing ? ButtonStyle.Light : ButtonStyle.Primary)"
-                         Disabled="@isRefreshing"
-                         Style="width: 100%">
-                @(isRefreshing ? "Actualizando..." : "Refrescar")
-            </RadzenButton>
-        </div>
     </div>
-    <RadzenAccordion>
-        <Items>
-            <RadzenAccordionItem Text="Agregar Usuario" Icon="add_business"
-                               CollapseTitle="Cerrar formulario" 
-                               ExpandTitle="Agregar nuevo usuario">
-                <UserAdd OnUserCreated="@HandleUserCreated" Orgs="@orgsPrivadas" />
-            </RadzenAccordionItem>
-        </Items>
-    </RadzenAccordion>
+
+    @if (CurrentUser?.Nivel >= 5)
+    {
+        <div class="row mb-3">
+            <div class="col">
+                <RadzenAccordion>
+                    <Items>
+                        <RadzenAccordionItem Text="Agregar Usuario" Icon="add">
+                            <UserAdd OnUserCreated="@HandleUserCreated" Orgs="@orgsPrivadas" />
+                        </RadzenAccordionItem>
+                    </Items>
+                </RadzenAccordion>
+            </div>
+        </div>
+    }
+
     @if (isLoading)
     {
-        //TODO: Barra de carga
-        <div class="text-center">
-            <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
-        </div>
+        <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
     }
-    else
-    {
-        <RadzenDataGrid @ref="gridUser" 
-                       TItem="ApplicationUser"
-                       Data="@users" 
-                       Count="@count"
-                       EditMode="@editMode"
-                       ExpandMode="DataGridExpandMode.Single"
-                       RowCreate="@OnCreateRow"
-                       RowUpdate="@OnUpdateRow"
-                       AllowFiltering="true"
-                       AllowColumnResize="true"
-                       AllowAlternatingRows="false"
-                       FilterMode="FilterMode.Advanced"
-                       AllowSorting="true" 
-                       PageSize="10" 
-                       AllowPaging="true"
-                       PagerHorizontalAlign="HorizontalAlign.Left"
-                       ShowPagingSummary="true"
-                       class="rz-shadow-3">
-            <HeaderTemplate>
-                
-            </HeaderTemplate>
-            <Columns>
-                <RadzenDataGridColumn TItem="ApplicationUser" Title="Nombre" Filterable="true" Width="200px">
-                    <Template Context="user">
-                        <div style="white-space:pre-wrap">@($"{user.Nombre} {user.Paterno} {user.Materno}")</div>
-                    </Template>
-                    <EditTemplate Context="user">
-                        <div class="mb-1">
-                            <RadzenFormField Text="Nombre" Style="width: 100%;">
-                                <RadzenTextBox Name="Nombre" @bind-Value="user.Nombre" Style="width: 90%" />
-                                <RadzenRequiredValidator Component="Nombre" Text="El Nombre es Obligatorio." />
-                            </RadzenFormField>
-                        </div>
 
-                        <div class="mb-1">
-                            <RadzenFormField Text="Apellido Paterno" Style="width: 100%;">
-                                <RadzenTextBox Name="Paterno" @bind-Value="user.Paterno" Style="width: 90%" />
-                                <RadzenRequiredValidator Component="Paterno" Text="El Apellido Paterno es Obligatorio." />
-                            </RadzenFormField>
-                        </div>
-
-                        <div>
-                            <RadzenFormField Text="Apellido Materno" Style="width: 100%;">
-                                <RadzenTextBox Name="Materno" @bind-Value="user.Materno" Style="width: 90%" />
-                            </RadzenFormField>
-                        </div>
-                    </EditTemplate>
-                </RadzenDataGridColumn>
-
-                <RadzenDataGridColumn TItem="ApplicationUser" Title="Email" Filterable="true" Width="200px">
-                    <Template Context="user">
-                        @user.Email
-                    </Template>
-                    <EditTemplate Context="user">
-                        <RadzenFormField Text="Email" Style="width: 100%;">
-                            <RadzenTextBox Name="Email" @bind-Value="user.Email" Style="width: 90%" />
-                            <RadzenRequiredValidator Component="Email" Text="El Email es Obligatorio." />
-                            <RadzenEmailValidator Component="Email" Text="Formato de Email inválido." />
-                        </RadzenFormField>
-                    </EditTemplate>
-                </RadzenDataGridColumn>
-
-                <RadzenDataGridColumn TItem="ApplicationUser" Title="Nivel" Filterable="true" Width="100px">
-                    <Template Context="user">
-                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@niveles[user.Nivel]" />
-                    </Template>
-                    <EditTemplate Context="user">
-                        <RadzenFormField Text="Nivel" Style="width: 100%;">
-                            <RadzenDropDown Name="Nivel" 
-                                           Data="@niveles" 
-                                           @bind-Value="user.Nivel"
-                                           TextProperty="Value" 
-                                           ValueProperty="Key" 
-                                           Style="width: 90%;" />
-                        </RadzenFormField>
-                    </EditTemplate>
-                </RadzenDataGridColumn>
-
-                <RadzenDataGridColumn TItem="ApplicationUser" Title="Estado" Filterable="true" Width="100px">
-                    <Template Context="user">
-                        <RadzenBadge BadgeStyle="@(user.EsActivo ? BadgeStyle.Success : BadgeStyle.Danger)"
-                                    Text="@(user.EsActivo ? "Activo" : "Inactivo")" />
-                    </Template>
-                    <EditTemplate Context="user">
-                        <RadzenFormField Text="Estado" Style="width: 100%;">
-                            <RadzenSwitch @bind-Value="user.EsActivo" />
-                        </RadzenFormField>
-                    </EditTemplate>
-                </RadzenDataGridColumn>
-
-                <RadzenDataGridColumn TItem="ApplicationUser" Context="user" 
-                                    Filterable="false" 
-                                    Sortable="false" 
-                                    TextAlign="TextAlign.Center" 
-                                    Width="100px">
-                    <Template Context="user">
-                        @if (ListaEdit)
-                        {
-                            <RadzenButton Click="@(() => EditRow(user))" 
-                                        Icon="edit" 
-                                        ButtonStyle="ButtonStyle.Light" 
-                                        Variant="Variant.Flat" 
-                                        Size="ButtonSize.Medium"
-                                        Disabled="@isEditing" />
-                            
-                        }
-                    </Template>
-                    <EditTemplate Context="user">
-                        <RadzenButton Icon="check" 
-                                    ButtonStyle="ButtonStyle.Success" 
-                                    Variant="Variant.Flat" 
-                                    Size="ButtonSize.Medium"
-                                    Click="@(() => SaveRow(user))" />
-                        <RadzenButton Icon="close" 
-                                    ButtonStyle="ButtonStyle.Light" 
-                                    Variant="Variant.Flat" 
-                                    Size="ButtonSize.Medium"
-                                    Click="@(() => CancelEdit(user))" />
-                        <RadzenButton Icon="delete" 
-                                    ButtonStyle="ButtonStyle.Danger" 
-                                    Variant="Variant.Flat" 
-                                    Size="ButtonSize.Medium"
-                                    Click="@(() => DeleteRow(user))" />
-                    </EditTemplate>
-                </RadzenDataGridColumn>
-            </Columns>
-        </RadzenDataGrid>
-        @if (CurrentUser.Nivel >= 5)
-        {
-            <RadzenButton Click="@ToggleBypassCache"
-                        Text="@(bypassCache ? "Lectura" : "Forzar Lectura")"  
-                                ButtonStyle="ButtonStyle.Light"
-                                class="me-2"
-                                disabled="@isRefreshing">
+    <RadzenDataGrid @ref="gridUser" 
+                   Data="@users" 
+                   Count="@count"
+                   EditMode="@editMode"
+                   ExpandMode="DataGridExpandMode.Single"
+                   AllowFiltering="true"
+                   AllowColumnResize="true"
+                   AllowAlternatingRows="false"
+                   FilterMode="FilterMode.Advanced"
+                   AllowSorting="true" 
+                   PageSize="10" 
+                   AllowPaging="true"
+                   PagerHorizontalAlign="HorizontalAlign.Left"
+                   ShowPagingSummary="true"
+                   class="rz-shadow-3">
+        <Columns>
+            <RadzenDataGridColumn TItem="ApplicationUser" Context="user" Width="70px">
+                <Template>
+                    @if (ListaEdit)
+                    {
+                        <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Class="m-1" Click="@(args => EditRow(user))" @onclick:stopPropagation="true">
+                        </RadzenButton>
+                    }
+                </Template>
+                <EditTemplate>
+                    <RadzenButton Icon="check" ButtonStyle="ButtonStyle.Primary" Class="m-1" Click="@(args => SaveRow(user))">
                     </RadzenButton>
-        }
-    }
+                    <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Light" Class="m-1" Click="@(args => CancelEdit(user))">
+                    </RadzenButton>
+                    <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Class="m-1" Click="@(args => DeleteRow(user))">
+                    </RadzenButton>
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="ApplicationUser" Title="Nombre" Filterable="true" Width="200px">
+                <Template Context="user">
+                    <div style="white-space:pre-wrap">@($"{user.Nombre} {user.Paterno} {user.Materno}")</div>
+                </Template>
+                <EditTemplate Context="user">
+                    <div class="mb-1">
+                        <RadzenFormField Text="Nombre" Style="width: 100%;">
+                            <RadzenTextBox Name="Nombre" @bind-Value="user.Nombre" Style="width: 90%" />
+                            <RadzenRequiredValidator Component="Nombre" Text="El Nombre es Obligatorio." />
+                        </RadzenFormField>
+                    </div>
+
+                    <div class="mb-1">
+                        <RadzenFormField Text="Apellido Paterno" Style="width: 100%;">
+                            <RadzenTextBox Name="Paterno" @bind-Value="user.Paterno" Style="width: 90%" />
+                            <RadzenRequiredValidator Component="Paterno" Text="El Apellido Paterno es Obligatorio." />
+                        </RadzenFormField>
+                    </div>
+
+                    <div>
+                        <RadzenFormField Text="Apellido Materno" Style="width: 100%;">
+                            <RadzenTextBox Name="Materno" @bind-Value="user.Materno" Style="width: 90%" />
+                        </RadzenFormField>
+                    </div>
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="ApplicationUser" Title="Email" Filterable="true" Width="200px">
+                <Template Context="user">
+                    @user.Email
+                </Template>
+                <EditTemplate Context="user">
+                    <RadzenFormField Text="Email" Style="width: 100%;">
+                        <RadzenTextBox Name="Email" @bind-Value="user.Email" Style="width: 90%" />
+                        <RadzenRequiredValidator Component="Email" Text="El Email es Obligatorio." />
+                        <RadzenEmailValidator Component="Email" Text="Formato de Email inválido." />
+                    </RadzenFormField>
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="ApplicationUser" Title="Nivel" Filterable="true" Width="100px">
+                <Template Context="user">
+                    <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@niveles[user.Nivel]" />
+                </Template>
+                <EditTemplate Context="user">
+                    <RadzenFormField Text="Nivel" Style="width: 100%;">
+                        <RadzenDropDown Name="Nivel" 
+                                       Data="@niveles" 
+                                       @bind-Value="user.Nivel"
+                                       TextProperty="Value" 
+                                       ValueProperty="Key" 
+                                       Style="width: 90%;" />
+                    </RadzenFormField>
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="ApplicationUser" Title="Estado" Filterable="true" Width="100px">
+                <Template Context="user">
+                    <RadzenBadge BadgeStyle="@(user.EsActivo ? BadgeStyle.Success : BadgeStyle.Danger)"
+                                Text="@(user.EsActivo ? "Activo" : "Inactivo")" />
+                </Template>
+                <EditTemplate Context="user">
+                    <RadzenFormField Text="Estado" Style="width: 100%;">
+                        <RadzenSwitch @bind-Value="user.EsActivo" />
+                    </RadzenFormField>
+                </EditTemplate>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
 </div>
 
 @code 
@@ -343,7 +305,7 @@
                     origen: "UserBase.OnCreateRow"
                 );
             }
-        }
+        } 
         
         protected async Task OnUpdateRow(ApplicationUser user)
         {

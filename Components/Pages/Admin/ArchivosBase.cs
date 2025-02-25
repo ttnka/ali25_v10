@@ -1,12 +1,11 @@
 using Ali25_V10.Data;
 using Ali25_V10.Data.Modelos;
-using Microsoft.AspNetCore.Components;
-using Microsoft.EntityFrameworkCore;
 using Ali25_V10.Data.Sistema;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Forms;
 using Radzen;
 using Radzen.Blazor;
-using System.IO;
-using Microsoft.AspNetCore.Components.Forms;
+using System.Threading;
 
 namespace Ali25_V10.Components.Pages.Admin;
 
@@ -18,24 +17,36 @@ public class ArchivosBase : ComponentBase, IDisposable
     [Inject] protected IConfiguration Configuration { get; set; } = default!;
 
     protected RadzenDataGrid<W180_Files> gridFiles = default!;
-    protected IEnumerable<W180_Files>? files;
-    protected bool isLoading;
-    protected string? errorMessage;
+    protected IEnumerable<W180_Files>? archivos;
     protected int count;
+    protected bool isLoading;
+    protected bool isRefreshing;
+    protected bool bypassCache;
+    protected string? errorMessage;
     protected string baseArchivosPath = "Componentes/Archivos";
     protected long maxFileSize = 10 * 1024 * 1024; // 10MB por defecto
-    
-    private readonly CancellationTokenSource _ctsOperations = new(TimeSpan.FromSeconds(30));
+
+    protected List<W180_Files> filesToInsert = new();
+    protected List<W180_Files> filesToUpdate = new();
+    protected DataGridEditMode editMode = DataGridEditMode.Single;
+
+    protected readonly CancellationTokenSource _ctsOperations = new(TimeSpan.FromSeconds(30));
+    protected readonly CancellationTokenSource _ctsBitacora = new(TimeSpan.FromSeconds(5));
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            // Configurar ruta base y tamaño máximo desde appsettings
             baseArchivosPath = Configuration["Archivos:BasePath"] ?? baseArchivosPath;
             maxFileSize = Configuration.GetValue<long>("Archivos:MaxFileSize", maxFileSize);
 
             await LoadData();
+            await RepoBitacora.AddBitacora(
+                userId: CurrentUser.Id,
+                desc: "Accediendo a lista de archivos",
+                orgId: CurrentUser.OrgId,
+                cancellationToken: _ctsBitacora.Token
+            );
         }
         catch (Exception ex)
         {
@@ -45,20 +56,36 @@ public class ArchivosBase : ComponentBase, IDisposable
 
     protected async Task LoadData()
     {
+        if (isLoading) return;
+        
         try
         {
             isLoading = true;
+            isRefreshing = true;
+            
             var result = await RepoFiles.Get(
                 orgId: CurrentUser.OrgId,
                 elUser: CurrentUser,
+                byPassCache: bypassCache,
                 cancellationToken: _ctsOperations.Token
             );
 
             if (result.Exito)
             {
-                files = result.DataVarios;
-                count = files?.Count() ?? 0;
+                archivos = result.DataVarios;
+                count = archivos?.Count() ?? 0;
             }
+        }
+        catch (OperationCanceledException)
+        {
+            await RepoBitacora.AddLog(
+                userId: CurrentUser?.Id ?? "Sistema",
+                orgId: CurrentUser?.OrgId ?? "Sistema",
+                desc: "Operación de carga de archivos cancelada por timeout",
+                tipoLog: "Warning",
+                origen: "ArchivosBase.LoadData",
+                cancellationToken: _ctsBitacora.Token
+            );
         }
         catch (Exception ex)
         {
@@ -67,7 +94,129 @@ public class ArchivosBase : ComponentBase, IDisposable
         finally
         {
             isLoading = false;
+            isRefreshing = false;
             StateHasChanged();
+        }
+    }
+
+    protected async Task RefreshData()
+    {
+        if (isRefreshing) return;
+        
+        try 
+        {   
+            isRefreshing = true;
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            await LogError(ex, "RefreshData");
+        }
+        finally
+        {
+            isRefreshing = false;
+            StateHasChanged();
+        }
+    }
+
+    protected void ToggleBypassCache()
+    {
+        bypassCache = !bypassCache;
+        LoadData();
+    }
+
+    protected void Reset(W180_Files file)
+    {
+        filesToInsert.Remove(file);
+        filesToUpdate.Remove(file);
+    }
+
+    protected void Reset()
+    {
+        filesToInsert.Clear();
+        filesToUpdate.Clear();
+    }
+
+    protected async Task EditRow(W180_Files file)
+    {
+        if (gridFiles?.EditMode == DataGridEditMode.Single)
+        {
+            Reset();
+        }
+        filesToUpdate.Add(file);
+        await gridFiles.EditRow(file);
+    }
+
+    protected async Task SaveRow(W180_Files file)
+    {
+        try
+        {
+            await gridFiles.UpdateRow(file);
+            var result = await RepoFiles.Update(
+                file, 
+                CurrentUser.OrgId,
+                elUser: CurrentUser,
+                cancellationToken: _ctsOperations.Token
+            );
+
+            if (!result.Exito)
+            {
+                throw new Exception(result.Texto);
+            }
+
+            await RepoBitacora.AddBitacora(
+                userId: CurrentUser.Id,
+                desc: $"Se actualizó el archivo {file.Archivo}",
+                orgId: CurrentUser.OrgId,
+                cancellationToken: _ctsBitacora.Token
+            );
+
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            await LogError(ex, "SaveRow");
+            throw;
+        }
+    }
+
+    protected void CancelEdit(W180_Files file)
+    {
+        Reset(file);
+        gridFiles.CancelEditRow(file);
+    }
+
+    protected async Task DeleteRow(W180_Files file)
+    {
+        try 
+        {
+            Reset(file);
+            if (archivos?.Contains(file) == true)
+            {
+                file.Status = false;
+                var result = await RepoFiles.Update(file, CurrentUser.OrgId, elUser: CurrentUser, cancellationToken: _ctsOperations.Token);
+                if (!result.Exito)
+                {
+                    throw new Exception(result.Texto);
+                }
+                await gridFiles.Reload();
+
+                await RepoBitacora.AddBitacora(
+                    userId: CurrentUser.Id,
+                    desc: $"Se eliminó el archivo {file.Archivo}",
+                    orgId: CurrentUser.OrgId,
+                    cancellationToken: _ctsBitacora.Token
+                );
+            }
+            else
+            {
+                gridFiles.CancelEditRow(file);
+                await gridFiles.Reload();
+            }
+        }
+        catch (Exception ex)
+        {
+            await LogError(ex, "DeleteRow");
         }
     }
 
@@ -76,45 +225,39 @@ public class ArchivosBase : ComponentBase, IDisposable
         try
         {
             var file = e.File;
-            if (file.Size > maxFileSize)
+            if (file == null)
             {
-                throw new Exception($"El archivo excede el tamaño máximo permitido ({maxFileSize / 1024 / 1024}MB)");
+                throw new Exception("No se seleccionó ningún archivo");
             }
 
-            // Crear estructura de carpetas
-            var year = DateTime.Now.Year.ToString();
-            var month = $"{DateTime.Now.Month:00}_{DateTime.Now.ToString("MMMM")}";
-            var orgFolder = CurrentUser.Org?.Rfc ?? CurrentUser.OrgId;
-            
-            var relativePath = Path.Combine(year, orgFolder, month);
-            var fullPath = Path.Combine(baseArchivosPath, relativePath);
-            
-            Directory.CreateDirectory(fullPath);
-
-            // Generar nombre único
-            var fileName = $"{DateTime.Now:yyyyMMddHHmmss}_{file.Name}";
-            var filePath = Path.Combine(fullPath, fileName);
-
-            // Guardar archivo
-            await using var stream = file.OpenReadStream(maxFileSize);
-            await using var fileStream = File.Create(filePath);
-            await stream.CopyToAsync(fileStream);
-
-            // Registrar en base de datos
-            var fileRecord = new W180_Files
+            if (file.Size > maxFileSize)
             {
-                Fecha = DateTime.Now,
-                OrgId = CurrentUser.OrgId,
-                Fuente = "Upload",
-                FuenteId = CurrentUser.Id,
-                Tipo = file.ContentType,
+                throw new Exception($"El archivo excede el tamaño máximo permitido de {maxFileSize / (1024 * 1024)}MB");
+            }
+
+            var allowedExtensions = new[] { ".pdf", ".jpg", ".jpeg", ".png", ".doc", ".docx", ".xls", ".xlsx" };
+            var extension = Path.GetExtension(file.Name).ToLowerInvariant();
+            if (!allowedExtensions.Contains(extension))
+            {
+                throw new Exception("Tipo de archivo no permitido");
+            }
+
+            var newFile = new W180_Files
+            {
                 Archivo = file.Name,
-                Ruta = Path.Combine(relativePath, fileName),
+                Tipo = file.ContentType,
+                Fuente = "Upload",
                 Estado = 5,
                 Status = true
             };
 
-            var result = await RepoFiles.Insert(fileRecord, CurrentUser.OrgId, CurrentUser, _ctsOperations.Token);
+            var result = await RepoFiles.Insert(
+                newFile,
+                CurrentUser.OrgId,
+                elUser: CurrentUser,
+                cancellationToken: _ctsOperations.Token
+            );
+
             if (!result.Exito)
             {
                 throw new Exception(result.Texto);
@@ -122,9 +265,9 @@ public class ArchivosBase : ComponentBase, IDisposable
 
             await RepoBitacora.AddBitacora(
                 userId: CurrentUser.Id,
-                desc: $"Archivo subido: {file.Name}",
+                desc: $"Se subió el archivo {file.Name}",
                 orgId: CurrentUser.OrgId,
-                cancellationToken: _ctsOperations.Token
+                cancellationToken: _ctsBitacora.Token
             );
 
             await LoadData();
@@ -132,36 +275,6 @@ public class ArchivosBase : ComponentBase, IDisposable
         catch (Exception ex)
         {
             await LogError(ex, "OnFileUpload");
-            throw;
-        }
-    }
-
-    protected async Task DeleteFile(W180_Files file)
-    {
-        try
-        {
-            // Eliminar archivo físico
-            var fullPath = Path.Combine(baseArchivosPath, file.Ruta);
-            if (File.Exists(fullPath))
-            {
-                File.Delete(fullPath);
-            }
-
-            // Eliminar registro
-            await RepoFiles.DeleteEntity(file, CurrentUser);
-            await LoadData();
-
-            await RepoBitacora.AddBitacora(
-                userId: CurrentUser.Id,
-                desc: $"Archivo eliminado: {file.Archivo}",
-                orgId: CurrentUser.OrgId,
-                cancellationToken: _ctsOperations.Token
-            );
-        }
-        catch (Exception ex)
-        {
-            await LogError(ex, "DeleteFile");
-            throw;
         }
     }
 
@@ -169,17 +282,18 @@ public class ArchivosBase : ComponentBase, IDisposable
     {
         errorMessage = ex.Message;
         await RepoBitacora.AddLog(
+            userId: CurrentUser.Id,
             desc: $"Error en {origen}: {ex.Message}",
             tipoLog: "Error",
             origen: $"ArchivosBase.{origen}",
-            userId: CurrentUser.Id,
             orgId: CurrentUser.OrgId,
-            cancellationToken: _ctsOperations.Token
+            cancellationToken: _ctsBitacora.Token
         );
     }
 
     public void Dispose()
     {
         _ctsOperations.Dispose();
+        _ctsBitacora.Dispose();
     }
 } 

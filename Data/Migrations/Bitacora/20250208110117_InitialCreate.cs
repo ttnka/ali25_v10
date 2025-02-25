@@ -6,12 +6,42 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Ali25_V10.Data.Migrations.Bitacora
 {
     /// <inheritdoc />
-    public partial class Inicial : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AlterDatabase()
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "Configuraciones",
+                columns: table => new
+                {
+                    ConfigId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    TipoGrupo = table.Column<bool>(type: "tinyint(1)", nullable: false),
+                    Grupo = table.Column<string>(type: "varchar(25)", maxLength: 25, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    NumeroId = table.Column<int>(type: "int", nullable: false),
+                    TextoId = table.Column<string>(type: "varchar(50)", maxLength: 50, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Titulo = table.Column<string>(type: "varchar(25)", maxLength: 25, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Descripcion = table.Column<string>(type: "varchar(1000)", maxLength: 1000, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Configuracion = table.Column<string>(type: "varchar(2)", maxLength: 2, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Global = table.Column<bool>(type: "tinyint(1)", nullable: false),
+                    OrgId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Estado = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<bool>(type: "tinyint(1)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Configuraciones", x => x.ConfigId);
+                })
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateTable(
@@ -48,7 +78,7 @@ namespace Ali25_V10.Data.Migrations.Bitacora
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     Comercial = table.Column<string>(type: "varchar(25)", maxLength: 25, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    RazonSocial = table.Column<string>(type: "varchar(75)", maxLength: 75, nullable: false)
+                    RazonSocial = table.Column<string>(type: "varchar(75)", maxLength: 75, nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     Moral = table.Column<bool>(type: "tinyint(1)", nullable: false),
                     NumCliente = table.Column<string>(type: "varchar(10)", maxLength: 10, nullable: true)
@@ -70,18 +100,16 @@ namespace Ali25_V10.Data.Migrations.Bitacora
                 {
                     Id = table.Column<string>(type: "varchar(255)", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    Nombre = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                    Nombre = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    Paterno = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                    Paterno = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    Materno = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                    Materno = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     FechaRegistro = table.Column<DateTime>(type: "datetime(6)", nullable: false),
                     FechaNacimiento = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    Nivel = table.Column<int>(type: "int", nullable: false),
                     EsActivo = table.Column<bool>(type: "tinyint(1)", nullable: false),
                     Estado = table.Column<int>(type: "int", nullable: false),
-                    Status = table.Column<bool>(type: "tinyint(1)", nullable: false),
                     OrgId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     UserName = table.Column<string>(type: "longtext", nullable: true)
@@ -131,6 +159,8 @@ namespace Ali25_V10.Data.Migrations.Bitacora
                     Desc = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     OrgId = table.Column<string>(type: "varchar(65)", maxLength: 65, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    W100_OrgOrgId = table.Column<string>(type: "varchar(65)", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4")
                 },
                 constraints: table =>
@@ -148,6 +178,11 @@ namespace Ali25_V10.Data.Migrations.Bitacora
                         principalTable: "W100_Org",
                         principalColumn: "OrgId",
                         onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_Bitacoras_W100_Org_W100_OrgOrgId",
+                        column: x => x.W100_OrgOrgId,
+                        principalTable: "W100_Org",
+                        principalColumn: "OrgId");
                 })
                 .Annotation("MySql:CharSet", "utf8mb4");
 
@@ -165,6 +200,11 @@ namespace Ali25_V10.Data.Migrations.Bitacora
                 name: "IX_Bitacoras_UserId",
                 table: "Bitacoras",
                 column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Bitacoras_W100_OrgOrgId",
+                table: "Bitacoras",
+                column: "W100_OrgOrgId");
         }
 
         /// <inheritdoc />
@@ -172,6 +212,9 @@ namespace Ali25_V10.Data.Migrations.Bitacora
         {
             migrationBuilder.DropTable(
                 name: "Bitacoras");
+
+            migrationBuilder.DropTable(
+                name: "Configuraciones");
 
             migrationBuilder.DropTable(
                 name: "Log");
