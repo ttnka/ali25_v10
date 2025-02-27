@@ -1,0 +1,52 @@
+@page "/admin"
+@inherits IndexAdminBase
+@rendermode InteractiveServer
+
+<PageTitle>Administracion</PageTitle>
+
+<h1>Administracion</h1>
+<AuthorizeView>
+    <Authorized>
+
+        <CascadingValue Value="@CurrentUser" Name="CurrentUser">
+            @if (CurrentUser != null && CurrentUser.Nivel > 5)
+            {
+                <RadzenTabs>
+                    <Tabs>
+
+                        <RadzenTabsItem Text="Bienvenido ">
+                            <h1>Bienvenido </h1>
+                        </RadzenTabsItem>
+                        <RadzenTabsItem Text="Bienvenido ">
+                            <Org />
+                        </RadzenTabsItem>
+                        <RadzenTabsItem Text="Organizaciones ">
+                            
+                            <RadzenTabs>
+                                <Tabs>
+                                    <RadzenTabsItem Text="Organizaciones ">
+                                        <Org />
+                                    </RadzenTabsItem>
+                                    <RadzenTabsItem Text="Usuarios ">
+                                        <User />
+                                    </RadzenTabsItem>
+                                </Tabs>
+                            </RadzenTabs>
+                        </RadzenTabsItem>
+                        
+                        <RadzenTabsItem Text="Bienvenido ">
+                            <h1>Bienvenido </h1>
+                        </RadzenTabsItem>
+                    </Tabs>
+                </RadzenTabs>
+            }
+            else
+            {
+                <h1>Bienvenido </h1>
+            }
+        </CascadingValue> 
+    </Authorized>
+    <NotAuthorized>
+        <RedirectToLogin />
+    </NotAuthorized>
+</AuthorizeView>

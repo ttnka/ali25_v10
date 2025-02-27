@@ -21,6 +21,8 @@ namespace Ali25_V10.Data
         public DbSet<W291_FormatoGpo> FormatosGrupos => Set<W291_FormatoGpo>();
         public DbSet<W292_FormatoDet> FormatosDetalles => Set<W292_FormatoDet>();
         public DbSet<WConfig> Configuraciones => Set<WConfig>();
+        public DbSet<IndexConfigItem> IndexConfig => Set<IndexConfigItem>();
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
@@ -31,6 +33,4 @@ namespace Ali25_V10.Data
                 .HasForeignKey(u => u.OrgId);
         }
     }
-
-    
 }

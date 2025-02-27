@@ -243,21 +243,10 @@ CAMBIOS PENDIENTES:
 
 ESTADO ACTUAL DEL SISTEMA:
 - Problemas identificados:
-  * Caché no mantiene consistencia
-  * Bitácoras no se escriben correctamente
-  * Posibles problemas de inyección de dependencias
-  * Necesidad de implementar CancellationTokens en nuevos componentes
-
+  
 - Próximos pasos:
-  * Diagnóstico de caché en Repo.cs
-  * Verificación de bitácoras
-  * Implementar IDisposable en nuevos componentes
-  * Revisar manejo de errores en componentes nuevos
-
+  
 ÚLTIMA ACTUALIZACIÓN: 01/Mar/2024
 
 CAMBIOS PENDIENTES:
-- Backup creado de Repo.cs
-- Implementación de nuevo sistema de caché
-- Punto de restauración establecido
-- Implementar CancellationTokens en componentes nuevos 
+- 

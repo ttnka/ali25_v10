@@ -75,10 +75,7 @@ REGLAS DE OPERACIÓN PARA CAMBIOS DE CÓDIGO:
 - Incluir archivos modificados
 - Incluir propósito del cambio
 
-9. ERRORES ACTUALES
-- Problema con caché en Repo.cs
-- Bitácoras no se escriben
-- Necesidad de diagnóstico sistemático
+
 
 ÚLTIMA ACTUALIZACIÓN: [Fecha y hora] 
 

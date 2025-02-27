@@ -7,9 +7,10 @@ using Radzen;
 using Radzen.Blazor;
 using System.Threading;
 
-namespace Ali25_V10.Components.Pages.Admin;
-
+namespace Ali25_V10.Components.Pages.Admin
+{
 public class ArchivosBase : ComponentBase, IDisposable
+
 {
     [CascadingParameter] protected ApplicationUser CurrentUser { get; set; } = default!;
     [Inject] protected IRepo<W180_Files> RepoFiles { get; set; } = default!;
@@ -297,3 +298,4 @@ public class ArchivosBase : ComponentBase, IDisposable
         _ctsBitacora.Dispose();
     }
 } 
+}
